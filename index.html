@@ -156,6 +156,24 @@ select {
 .minefacts dd { margin: 0; font: 800 24px/1.1 var(--display); letter-spacing: 0.01em; }
 .minefacts dd small { font: 400 12px/1.3 var(--mono); color: var(--mist); display: block; margin-top: 3px; letter-spacing: 0; }
 .minemap { margin-bottom: 0; }
+.mapbox.minemap canvas#mineMap { touch-action: none; cursor: grab; }
+.mapbox.minemap.dragging canvas#mineMap { cursor: grabbing; }
+.mapbox.minemap.world canvas { aspect-ratio: 2 !important; }
+@media (max-width: 700px) {
+  .mapbox.minemap.world canvas { aspect-ratio: 1.35 !important; } /* room above and below the world for the controls */
+  .maptools .seg button, .maptools .btn { padding: 5px 9px; font-size: 12px; min-width: 0; }
+}
+.maptools { position: absolute; z-index: 3; top: 10px; right: 10px; left: 10px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.maptools > * { pointer-events: auto; }
+.maptools .seg { background: rgba(6, 10, 19, 0.7); }
+.maptools .zoom { display: flex; gap: 6px; }
+.maptools .btn { background: rgba(6, 10, 19, 0.7); padding: 6px 12px; min-width: 34px; justify-content: center; }
+.youpin { position: absolute; z-index: 2; left: 0; top: 0; pointer-events: none; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; }
+.youpin span { background: var(--whisky); color: var(--ink); font: 700 12px/1 var(--body); letter-spacing: 0.02em; padding: 5px 9px; border-radius: 999px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.youpin::after { content: ""; width: 0; height: 0; border: 5px solid transparent; border-top-color: var(--whisky); margin-top: -1px; }
+.youpin::before { content: ""; position: absolute; left: 50%; bottom: -9px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--whisky); box-shadow: 0 0 0 2px var(--ink), 0 0 0 8px rgba(244, 184, 96, 0.22); }
+.youpin.town span { background: rgba(6, 10, 19, 0.82); color: var(--whisky); box-shadow: inset 0 0 0 1px rgba(244, 184, 96, 0.6); }
+.youpin.town::after { border-top-color: rgba(244, 184, 96, 0.6); }
 .mapbox.minemap canvas { aspect-ratio: 2.1; }
 @media (max-width: 700px) { .mapbox.minemap canvas { aspect-ratio: 1.15; } }
 .abroad { margin: 0 0 22px; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(180, 140, 255, 0.35); background: rgba(180, 140, 255, 0.08); max-width: 760px; }
@@ -356,6 +374,7 @@ footer p { margin: 0; max-width: 90ch; }
           <canvas id="map" aria-label="Map of Scotland showing the aurora oval and viewing spots" role="img"></canvas>
           <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="ovTime"></span></div>
           <div class="tip" id="tip" hidden></div>
+          <div class="youpin" id="mapPin" hidden><span></span></div>
         </div>
         <p class="maphint"><span class="mouse">Hover a spot for its details. Click it to find it in the list.</span><span class="touch">Tap a spot for its details. Tap it again to find it in the list.</span></p>
         </div>
@@ -373,9 +392,22 @@ footer p { margin: 0; max-width: 90ch; }
         </div>
       </div>
       <div class="mapbox minemap" id="mineMapBox">
-        <canvas id="mineMap" role="img" aria-label="Globe view showing the aurora oval and your position"></canvas>
+        <canvas id="mineMap" role="img" aria-label="Map of the aurora oval and your position. Drag to move it."></canvas>
+        <div class="maptools">
+          <div class="seg" role="group" aria-label="Map view">
+            <button type="button" id="viewNear" aria-pressed="true">Near me</button>
+            <button type="button" id="viewWorld" aria-pressed="false">Whole world</button>
+          </div>
+          <div class="zoom">
+            <button type="button" class="btn" id="zoomOut" aria-label="Zoom out">−</button>
+            <button type="button" class="btn" id="zoomIn" aria-label="Zoom in">+</button>
+            <button type="button" class="btn" id="recenter">Recenter</button>
+          </div>
+        </div>
+        <div class="youpin" id="minePin" hidden><span></span></div>
         <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="mineMapNote"></span></div>
       </div>
+      <p class="maphint"><span class="mouse">Drag to move the map. Scroll to zoom.</span><span class="touch">Drag to move the map. Pinch to zoom.</span></p>
     </div>
   </section>
 
@@ -1006,7 +1038,7 @@ function drawMap() {
 
   // town marker
   const t = S.townObj;
-  if (t) { const [x, y] = P(t.lon, t.lat); c.strokeStyle = col("--whisky"); c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 5, y); c.lineTo(x + 5, y); c.moveTo(x, y - 5); c.lineTo(x, y + 5); c.stroke(); c.fillStyle = col("--whisky"); c.fillText(t === S.here ? "You" : t.name, x + 7, y + 3); }
+  if (t) { const [x, y] = P(t.lon, t.lat); placePin($("mapPin"), x, y - 9, W, H, t === S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : t.name, t !== S.here); }
   if (S.abroad && S.here) {
     // great-circle bearing from the middle of the map to the visitor, shown as an arrow on the map's edge
     const f1 = rad(57.7), f2 = rad(S.here.lat), dl = rad(S.here.lon + 4);
@@ -1056,62 +1088,146 @@ function drawMap() {
 }
 
 /* ---------- the visitor's own map: their coastline, their position and the live aurora oval ---------- */
-function drawMineMap() {
+/* the "You" pin: an HTML tag above a dot, so it stays crisp above the aurora layers */
+function placePin(el, x, y, W, H, text, isTown) {
+  const show = x > 6 && x < W - 6 && y > 30 && y < H - 4;
+  el.hidden = !show;
+  if (!show) return;
+  el.firstElementChild.textContent = text;
+  el.classList.toggle("town", !!isTown);
+  el.style.left = x + "px"; el.style.top = y + "px";
+}
+/* map view: "near" is a draggable, zoomable globe centred near you; "world" is a flat map of the whole planet */
+const VIEW = { mode: "near", lon: null, lat: null, span: 17, worldLon: 0, dragging: false };
+function drawMineMap(fast) {
   const ref = S.here || S.townObj;
   if (!ref) return;
-  const cv = $("mineMap"), r = cv.getBoundingClientRect();
+  const box = $("mineMapBox"), cv = $("mineMap");
+  box.classList.toggle("world", VIEW.mode === "world");
+  const r = cv.getBoundingClientRect();
   if (!r.width) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
   const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = r.width, H = r.height, css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
   const pole = ref.lat < 0 ? -1 : 1;
-  const lat0 = clamp(ref.lat + 7 * pole, -86, 86), lon0 = ref.lon;
-  const R = Math.min(W, H) / 2 / Math.sin(rad(17));
-  const f0 = rad(lat0), sf0 = Math.sin(f0), cf0 = Math.cos(f0), l0 = rad(lon0);
-  const P = (lon, lat) => {
-    const f = rad(lat), dl = rad(lon) - l0, cf = Math.cos(f), sf = Math.sin(f);
-    let x = cf * Math.sin(dl), y = cf0 * sf - sf0 * cf * Math.cos(dl);
-    const front = sf0 * sf + cf0 * cf * Math.cos(dl);
-    if (front < 0) { const n = Math.hypot(x, y) || 1; x /= n; y /= n; } // behind the globe: pin to the horizon
-    return [W / 2 + R * x, H / 2 - R * y, front];
-  };
-  c.clearRect(0, 0, W, H);
-  // land
-  c.beginPath();
-  for (const ring of world) ring.forEach(([lon, lat], i) => { const [x, y] = P(lon, lat); i ? c.lineTo(x, y) : c.moveTo(x, y); });
-  c.fillStyle = col("--peat"); c.globalAlpha = 0.95; c.fill("evenodd"); c.globalAlpha = 1;
-  c.strokeStyle = "rgba(233,238,246,0.2)"; c.lineWidth = 0.8; c.stroke();
-  // latitude rings
-  c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.12)"; c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
-  for (let la = 30; la <= 80; la += 10) {
-    const lat = la * pole; c.beginPath(); let started = false, lx = null;
-    for (let lo = -180; lo <= 180; lo += 2) { const [x, y, fr] = P(lo, lat); if (fr < 0.05) { started = false; continue; } started ? c.lineTo(x, y) : c.moveTo(x, y); started = true; if (x > 6 && x < 60 && y > 10 && y < H - 10) lx = [x, y]; }
-    c.stroke();
-    const [tx, ty, fr] = P(lon0 - 0, lat);
-    if (fr > 0.05 && ty > 12 && ty < H - 24) c.fillText(la + "°" + (pole > 0 ? "N" : "S"), 8, ty - 3);
+  let P, inv, pxPerDeg, labelLat;
+  if (VIEW.mode === "world") {
+    const sx = W / 360, lonC = VIEW.worldLon;
+    const wrap = (d) => ((d % 360) + 540) % 360 - 180;
+    P = (lon, lat) => [W / 2 + wrap(lon - lonC) * sx, H / 2 - lat * sx, 1];
+    inv = (x, y) => { const lat = (H / 2 - y) / sx; return Math.abs(lat) > 89.5 ? null : [lonC + (x - W / 2) / sx, lat]; };
+    pxPerDeg = sx;
+    c.clearRect(0, 0, W, H);
+    // land, drawn in three copies so panning sideways never shows a seam
+    c.beginPath();
+    for (const k of [-360, 0, 360]) for (const ring of world) {
+      let prev = null;
+      ring.forEach(([lon, lat], i) => {
+        const x = W / 2 + (lon - lonC + k) * sx, y = H / 2 - lat * sx;
+        if (!i || Math.abs(lon - prev) > 180) c.moveTo(x, y); else c.lineTo(x, y); // islands that straddle the date line
+        prev = lon;
+      });
+    }
+    c.fillStyle = col("--peat"); c.globalAlpha = 0.95; c.fill("evenodd"); c.globalAlpha = 1;
+    c.strokeStyle = "rgba(233,238,246,0.2)"; c.lineWidth = 0.7; c.stroke();
+    c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.1)"; c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
+    for (const la of [-60, -30, 0, 30, 60]) { const y = H / 2 - la * sx; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); c.fillText(Math.abs(la) + "°" + (la > 0 ? "N" : la < 0 ? "S" : ""), 8, y - 3); }
+    c.setLineDash([]);
+  } else {
+    const lat0 = VIEW.lat != null ? VIEW.lat : clamp(ref.lat + 7 * pole, -86, 86), lon0 = VIEW.lon != null ? VIEW.lon : ref.lon;
+    VIEW.curLat = lat0; VIEW.curLon = lon0;
+    const R = Math.min(W, H) / 2 / Math.sin(rad(VIEW.span));
+    VIEW.R = R;
+    const f0 = rad(lat0), sf0 = Math.sin(f0), cf0 = Math.cos(f0), l0 = rad(lon0);
+    P = (lon, lat) => {
+      const f = rad(lat), dl = rad(lon) - l0, cf = Math.cos(f), sf = Math.sin(f);
+      let x = cf * Math.sin(dl), y = cf0 * sf - sf0 * cf * Math.cos(dl);
+      const front = sf0 * sf + cf0 * cf * Math.cos(dl);
+      if (front < 0) { const n = Math.hypot(x, y) || 1; x /= n; y /= n; } // behind the globe: pin to the horizon
+      return [W / 2 + R * x, H / 2 - R * y, front];
+    };
+    inv = (x, y) => {
+      const X = (x - W / 2) / R, Y = (H / 2 - y) / R, rho = Math.hypot(X, Y);
+      if (rho >= 1) return null;
+      const cc = Math.asin(rho), sc = Math.sin(cc), ccos = Math.cos(cc);
+      const lat = rho < 1e-9 ? lat0 : Math.asin(ccos * sf0 + Y * sc * cf0 / rho) * 180 / Math.PI;
+      const lon = lon0 + Math.atan2(X * sc, rho * ccos * cf0 - Y * sc * sf0) * 180 / Math.PI;
+      return [lon, lat];
+    };
+    pxPerDeg = R * rad(1);
+    c.clearRect(0, 0, W, H);
+    // the globe's disc, then land
+    c.beginPath(); c.arc(W / 2, H / 2, R, 0, Math.PI * 2); c.fillStyle = "rgba(26,38,64,0.35)"; c.fill();
+    c.beginPath();
+    for (const ring of world) ring.forEach(([lon, lat], i) => { const [x, y] = P(lon, lat); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+    c.fillStyle = col("--peat"); c.globalAlpha = 0.95; c.fill("evenodd"); c.globalAlpha = 1;
+    c.strokeStyle = "rgba(233,238,246,0.2)"; c.lineWidth = 0.8; c.stroke();
+    c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.12)"; c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
+    for (let la = -80; la <= 80; la += 10) {
+      if (la === 0) continue;
+      c.beginPath(); let started = false;
+      for (let lo = -180; lo <= 180; lo += 2) { const [x, y, fr] = P(lo, la); if (fr < 0.05) { started = false; continue; } started ? c.lineTo(x, y) : c.moveTo(x, y); started = true; }
+      c.stroke();
+      const [, ty, fr] = P(lon0, la);
+      if (fr > 0.05 && ty > 40 && ty < H - 24) c.fillText(Math.abs(la) + "°" + (la > 0 ? "N" : "S"), 8, ty - 3);
+    }
+    c.setLineDash([]);
   }
-  c.setLineDash([]);
-  // aurora oval: NOAA's OVATION model, or a stand-in from Kp and magnetic latitude
-  const kpNow = kpAt(Date.now());
-  const inv = (x, y) => { // inverse of the globe projection, for the oval layer
-    const X = (x - W / 2) / R, Y = (H / 2 - y) / R, rho = Math.hypot(X, Y);
-    if (rho >= 1) return null;
-    const cc = Math.asin(rho), sc = Math.sin(cc), ccos = Math.cos(cc);
-    const lat = rho < 1e-9 ? lat0 : Math.asin(ccos * sf0 + Y * sc * cf0 / rho) * 180 / Math.PI;
-    const lon = lon0 + Math.atan2(X * sc, rho * ccos * cf0 - Y * sc * sf0) * 180 / Math.PI;
-    return [lon, lat];
-  };
-  // the visitor
-  const [ux, uy] = P(ref.lon, ref.lat);
-  c.beginPath(); c.arc(ux, uy, 11, 0, Math.PI * 2); c.fillStyle = "rgba(244,184,96,0.18)"; c.fill();
-  c.strokeStyle = col("--whisky"); c.lineWidth = 1.8; c.beginPath(); c.moveTo(ux - 7, uy); c.lineTo(ux + 7, uy); c.moveTo(ux, uy - 7); c.lineTo(ux, uy + 7); c.stroke();
-  c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body");
-  const lab = S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : ref.name;
-  c.fillText(lab, ux + 12 + c.measureText(lab).width > W - 8 ? ux - 12 - c.measureText(lab).width : ux + 12, uy + 4);
+  // the "You" pin (or the chosen town)
+  const [ux, uy, ufr] = P(ref.lon, ref.lat);
+  const pin = $("minePin");
+  if (ufr !== undefined && ufr < 0.05) pin.hidden = true;
+  else placePin(pin, ux, uy - 9, W, H, S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : ref.name, !S.here);
   $("mineMapNote").textContent = S.ov && S.ovFull ? (S.ovAt ? "OVATION model, " + ltf.format(S.ovAt) : "") : "Estimated from Kp";
-  setFlow(flowMine, P, W, H, R * rad(1), true, null, inv);
+  setFlow(flowMine, P, W, H, pxPerDeg, true, null, inv, fast);
 }
+/* drag to move, wheel or pinch to zoom, buttons for both */
+(function mapControls() {
+  const cv = $("mineMap"), box = $("mineMapBox");
+  const pts = new Map();
+  let last = null, pinch = null, raf = 0;
+  const redraw = (fast) => { if (fast) { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawMineMap(true); }); } else { cancelAnimationFrame(raf); raf = 0; drawMineMap(false); } };
+  function paintView() { $("viewNear").setAttribute("aria-pressed", String(VIEW.mode === "near")); $("viewWorld").setAttribute("aria-pressed", String(VIEW.mode === "world")); $("zoomIn").disabled = $("zoomOut").disabled = VIEW.mode === "world"; }
+  const zoomBy = (k) => { VIEW.span = clamp(VIEW.span * k, 5, 60); redraw(false); };
+  cv.addEventListener("pointerdown", (e) => {
+    cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1) last = [e.clientX, e.clientY];
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), span: VIEW.span }; }
+    box.classList.add("dragging"); VIEW.dragging = true;
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2 && pinch && VIEW.mode === "near") {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      VIEW.span = clamp(pinch.span * pinch.d / Math.max(10, d), 5, 60); redraw(true); return;
+    }
+    if (pts.size !== 1 || !last) return;
+    const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
+    if (VIEW.mode === "world") { VIEW.worldLon -= dx / (cv.getBoundingClientRect().width / 360); }
+    else {
+      const R = VIEW.R || 300;
+      VIEW.lon = (VIEW.curLon != null ? VIEW.curLon : 0) - dx / R * 180 / Math.PI / Math.max(0.2, Math.cos(rad(VIEW.curLat || 0)));
+      VIEW.lat = clamp((VIEW.curLat != null ? VIEW.curLat : 0) + dy / R * 180 / Math.PI, -89, 89);
+    }
+    redraw(true);
+  });
+  const end = (e) => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 1) last = [...pts.values()][0];
+    if (pts.size === 0) { last = null; box.classList.remove("dragging"); VIEW.dragging = false; redraw(false); }
+  };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("wheel", (e) => { if (VIEW.mode !== "near") return; e.preventDefault(); zoomBy(e.deltaY > 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+  $("zoomIn").addEventListener("click", () => zoomBy(1 / 1.3));
+  $("zoomOut").addEventListener("click", () => zoomBy(1.3));
+  $("recenter").addEventListener("click", () => { VIEW.lon = VIEW.lat = null; VIEW.span = 17; const ref = S.here || S.townObj; VIEW.worldLon = ref ? ref.lon : 0; redraw(false); });
+  $("viewNear").addEventListener("click", () => { VIEW.mode = "near"; paintView(); redraw(false); });
+  $("viewWorld").addEventListener("click", () => { VIEW.mode = "world"; const ref = S.here || S.townObj; if (ref && VIEW.worldLon === 0) VIEW.worldLon = Math.round(ref.lon); paintView(); requestAnimationFrame(() => redraw(false)); });
+  paintView();
+})();
 
 /* ---------- precipitation-map look for the oval ----------
    The aurora value is roughened with drifting value noise (the clumpy, radar-like texture), then mapped
@@ -1142,8 +1258,8 @@ const RAMP_LUT = (() => {
   }
   return lut;
 })();
-function buildPrecip(f, inv) {
-  const q = 3, ow = Math.ceil(f.W / q), oh = Math.ceil(f.H / q);
+function buildPrecip(f, inv, quality) {
+  const q = quality || 3, ow = Math.ceil(f.W / q), oh = Math.ceil(f.H / q);
   const cv = document.createElement("canvas"); cv.width = ow; cv.height = oh;
   const ctx = cv.getContext("2d"), img = ctx.createImageData(ow, oh);
   const idx = [], lon = [], lat = [], val = [];
@@ -1206,13 +1322,22 @@ function makeFlow(baseId) {
   if ("IntersectionObserver" in window) new IntersectionObserver((es) => { f.visible = es[0].isIntersecting; }).observe(base);
   return f;
 }
-function setFlow(f, P, W, H, pxPerDeg, global, b, inv) {
+function setFlow(f, P, W, H, pxPerDeg, global, b, inv, fast) {
   if (!f) return;
   const ref = S.here || S.townObj;
-  const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && ref ? ref.lat + "," + ref.lon : ""].join("|");
+  const view = global ? [VIEW.mode, VIEW.lon, VIEW.lat, VIEW.span, VIEW.worldLon].join(",") : "";
+  const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && ref ? ref.lat + "," + ref.lon : "", view].join("|");
   f.P = P;
   if (f.key === key) return; // same view and data (e.g. a hover redraw): keep the particles flowing
   f.key = key;
+  if (fast && f.W === W && f.H === H) {
+    // while dragging: particles keep their place on the Earth and simply re-project; the oval is redrawn coarsely
+    Object.assign(f, { P, pxPerDeg });
+    f.key = null; // so the full-quality redraw after the drag isn't skipped
+    f.ctx.clearRect(0, 0, W, H);
+    buildPrecip(f, inv, 6); renderPrecip(f, flowT / 60);
+    return;
+  }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   for (const [cv, ctx] of [[f.cv, f.ctx], [f.pre, f.pctx]]) {
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
@@ -1267,6 +1392,7 @@ function flowFrame() {
       p.age++;
       const [x1, y1, fr] = f.P(p.lon, p.lat);
       if (p.age > p.life || v < 0.06 || (fr !== undefined && fr < 0.2) || x1 < -5 || x1 > f.W + 5 || y1 < -5 || y1 > f.H + 5) { f.parts[i] = spawn(f, false); continue; }
+      if (Math.abs(x1 - x0) > f.W / 3) continue; // crossed the edge of the flat world map
       const k = p.age / p.life, fade = Math.min(1, k * 6, (1 - k) * 4);
       const a = (0.22 + 0.6 * v) * fade;
       c.strokeStyle = v > 0.6 ? "rgba(196,160,255," + a.toFixed(3) + ")" : "rgba(110,245,190," + a.toFixed(3) + ")";
