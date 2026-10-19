@@ -136,7 +136,8 @@ section.block { padding-block: 56px; border-top: 1px solid var(--rule); }
 
 /* spots + map */
 .where { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 28px; align-items: start; }
-@media (max-width: 880px) { .where { grid-template-columns: minmax(0, 1fr); } .mapcol { order: -1; } }
+.mapcol { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 880px) { .where { grid-template-columns: minmax(0, 1fr); } .mapcol { order: -1; position: static; } }
 .near { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .near label { color: var(--mist); font-size: 14px; }
 select {
@@ -830,7 +831,12 @@ function renderSpots() {
     const b = document.createElement("button");
     b.type = "button"; b.className = "spot"; b.dataset.id = r.s.id;
     b.setAttribute("aria-pressed", String(r.s.id === S.sel));
-    b.addEventListener("click", () => { S.sel = r.s.id; S.picked = true; renderSpots(); renderTonight(); drawMap(); });
+    b.addEventListener("click", () => {
+      S.sel = r.s.id; S.picked = true; renderSpots(); renderTonight(); drawMap(); flyTo(r.s);
+      // on phones the map sits above the list: bring it back into view
+      const mb = $("mapbox").getBoundingClientRect();
+      if (window.matchMedia("(max-width: 880px)").matches && (mb.bottom < 60 || mb.top > window.innerHeight - 60)) $("mapbox").scrollIntoView({ behavior: REDUCE_MOTION ? "auto" : "smooth", block: "start" });
+    });
     const pct = document.createElement("div");
     pct.className = "pct"; pct.style.color = chanceColor(r.best.p);
     writeChance(pct, r.best.p, true);
@@ -1135,7 +1141,8 @@ function drawMap(fast) {
     if (r.s.id === hoverId && !sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.globalAlpha = 0.6; c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
     c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
     c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
-    if (sel && zoomK > 0.7) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
+    if (sel) { c.beginPath(); c.arc(x, y, Math.max(rad0, 4) + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); }
+    if (sel && zoomK > 0.5) { c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
   $("ovTime").textContent = S.ov && (S.ovFull || local) ? (S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : "") : "Estimated from Kp";
 
@@ -1148,7 +1155,7 @@ function drawMap(fast) {
     if (local) for (let la = 61.5; la <= 82 && edgeLat == null; la += 0.5) for (let lo = -6; lo <= 2; lo += 2) if (auroraVal(lo, la) >= 4) { edgeLat = la; break; }
     const msg = edgeLat != null ? "Aurora oval: about " + Math.round((edgeLat - 60.15) * 111 / 50) * 50 + " km north of Shetland. Zoom out to see it" : "No aurora in view. Zoom out to find the oval";
     c.font = "600 12.5px " + col("--body");
-    const mw = c.measureText(msg).width, mx = clamp((W - mw) / 2, 30, W - mw - 12), my = 64;
+    const mw = c.measureText(msg).width, mx = clamp((W - mw) / 2, 30, W - mw - 12), my = H - 44; // just above the legend
     c.fillStyle = "rgba(6,10,19,0.75)"; c.beginPath(); c.roundRect ? c.roundRect(mx - 26, my - 16, mw + 40, 24, 12) : c.rect(mx - 26, my - 16, mw + 40, 24); c.fill();
     c.fillStyle = col("--dancer");
     c.beginPath(); c.moveTo(mx - 14, my - 1); c.lineTo(mx - 8, my - 9); c.lineTo(mx - 2, my - 1); c.closePath(); c.fill();
@@ -1156,12 +1163,42 @@ function drawMap(fast) {
     c.font = "10px " + col("--mono");
   }
 }
+/* glide the map so a place sits in the middle: zoom back in to the local view if we're further out */
+let flight = 0;
+function flyTo(place) {
+  if (!MV.cur) { drawMap(); return; }
+  cancelAnimationFrame(flight);
+  const v = MV.cur;
+  let from, to;
+  if (MV.mode === "globe") {
+    const R0 = v.R, R1 = Math.max(R0, MV.fitR || R0);
+    from = { lat: v.lat0, lon: v.lon0, z: R0 }; to = { lat: place.lat, lon: place.lon, z: R1 };
+  } else {
+    const s0 = v.s, s1 = Math.max(s0, (MV.fitS || 1) * 26);
+    from = { lat: v.latC, lon: v.lonC, z: s0 }; to = { lat: place.lat, lon: place.lon, z: s1 };
+  }
+  const dLon = wrapLon(to.lon - from.lon), dLat = to.lat - from.lat, zr = to.z / from.z;
+  const set = (k) => {
+    const lat = from.lat + dLat * k, lon = from.lon + dLon * k, z = from.z * Math.pow(zr, k);
+    if (MV.mode === "globe") Object.assign(MV.g, { custom: true, lat, lon, R: z });
+    else Object.assign(MV.m, { custom: true, latC: lat, lonC: lon, s: z });
+  };
+  if (REDUCE_MOTION) { set(1); drawMap(false); return; }
+  const t0 = performance.now(), dur = clamp(450 + Math.hypot(dLon * Math.cos(rad(to.lat)), dLat) * 6 + Math.abs(Math.log(zr)) * 160, 450, 1200);
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    set(e);
+    if (k < 1) { drawMap(true); flight = requestAnimationFrame(step); } else drawMap(false);
+  };
+  flight = requestAnimationFrame(step);
+}
 (function mapControls() {
   const cv = $("map"), box = $("mapbox");
   const pts = new Map();
   let last = null, pinch = null, raf = 0, moved = 0;
   const redraw = (fast) => { if (fast) { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawMap(true); }); } else { cancelAnimationFrame(raf); raf = 0; drawMap(false); } };
   const take = () => { // the first move takes over from the automatic view
+    cancelAnimationFrame(flight);
     const v = MV.cur; if (!v) return;
     if (MV.mode === "globe" && !MV.g.custom) Object.assign(MV.g, { custom: true, lat: v.lat0, lon: v.lon0, R: v.R });
     if (MV.mode === "map" && !MV.m.custom) Object.assign(MV.m, { custom: true, lonC: v.lonC, latC: v.latC, s: v.s });
