@@ -119,7 +119,7 @@ section.block { padding-block: 56px; border-top: 1px solid var(--rule); }
 
 /* spots + map */
 .where { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 28px; align-items: start; }
-@media (max-width: 880px) { .where { grid-template-columns: minmax(0, 1fr); } .mapbox { order: -1; } }
+@media (max-width: 880px) { .where { grid-template-columns: minmax(0, 1fr); } .mapcol { order: -1; } }
 .near { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .near label { color: var(--mist); font-size: 14px; }
 select {
@@ -149,6 +149,29 @@ select {
 .mapbox { position: relative; background: radial-gradient(120% 90% at 50% 0%, var(--loch), var(--night) 70%); border: 1px solid var(--rule); border-radius: 18px; overflow: hidden; }
 .mapbox canvas { display: block; width: 100%; aspect-ratio: 0.92; max-width: 100%; }
 .legend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 400 11px/1.3 var(--mono); color: var(--mist); pointer-events: none; }
+.mapbox canvas { touch-action: manipulation; }
+.tip {
+  position: absolute; z-index: 2; left: 0; top: 0; width: min(290px, calc(100% - 20px));
+  background: rgba(11, 18, 34, 0.95); border: 1px solid rgba(95, 240, 176, 0.28); border-radius: 14px;
+  padding: 14px 16px; display: grid; gap: 9px; pointer-events: none;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.tip.pinned { pointer-events: auto; left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; }
+.tip-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.tip-top > div { min-width: 0; }
+.tip-name { font: 800 22px/1.02 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+.tip-area { color: var(--mist); font-size: 13px; margin-top: 3px; }
+.tip-pct { font: 900 36px/0.9 var(--display); flex: none; }
+.tip-pct small { font: 500 12px var(--mono); color: var(--mist); }
+.tip .kv { font-size: 13px; gap: 4px 12px; }
+.tip p { margin: 0; color: var(--mist); font-size: 13px; line-height: 1.45; }
+.tip .hint { font: 400 11px/1.3 var(--mono); color: var(--dim); }
+.tip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.maphint { margin: 10px 2px 0; font: 400 12px/1.4 var(--mono); color: var(--dim); }
+.maphint .touch { display: none; }
+@media (hover: none) { .maphint .mouse { display: none; } .maphint .touch { display: inline; } }
+.spot.flash { animation: flash 1.8s ease-out; }
+@keyframes flash { 0% { background: rgba(95, 240, 176, 0.22); box-shadow: inset 0 0 0 2px var(--dancer); } 100% { background: var(--peat); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); } }
 .ramp { display: inline-block; width: 90px; height: 6px; border-radius: 3px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, rgba(95, 240, 176, 0), rgba(95, 240, 176, .6), var(--heather)); }
 
 /* tonight */
@@ -262,9 +285,13 @@ footer p { margin: 0; max-width: 90ch; }
       </div>
       <div class="where">
         <ol class="spots" id="spots" aria-label="Viewing spots ranked by chance"></ol>
-        <div class="mapbox">
+        <div class="mapcol">
+        <div class="mapbox" id="mapbox">
           <canvas id="map" aria-label="Map of Scotland showing the aurora oval and viewing spots" role="img"></canvas>
           <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="ovTime"></span></div>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <p class="maphint"><span class="mouse">Hover a spot for its details. Click it to find it in the list.</span><span class="touch">Tap a spot for its details. Tap it again to find it in the list.</span></p>
         </div>
       </div>
     </div>
@@ -641,7 +668,7 @@ function renderSpots() {
   S.ranked.forEach((r, k) => {
     const li = document.createElement("li");
     const b = document.createElement("button");
-    b.type = "button"; b.className = "spot";
+    b.type = "button"; b.className = "spot"; b.dataset.id = r.s.id;
     b.setAttribute("aria-pressed", String(r.s.id === S.sel));
     b.addEventListener("click", () => { S.sel = r.s.id; S.picked = true; renderSpots(); renderTonight(); drawMap(); });
     const pct = document.createElement("div");
@@ -754,6 +781,7 @@ function renderStatus() {
 }
 function renderAll() {
   compute(); renderHero(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
+  if (pinned) showTip(pinned, "pin"); else if (hoverId) showTip(hoverId, "hover");
 }
 
 /* ---------- map ---------- */
@@ -805,10 +833,13 @@ function drawMap() {
   if (t) { const [x, y] = P(t.lon, t.lat); c.strokeStyle = col("--whisky"); c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 5, y); c.lineTo(x + 5, y); c.moveTo(x, y - 5); c.lineTo(x, y + 5); c.stroke(); c.fillStyle = col("--whisky"); c.fillText(t.name, x + 7, y + 3); }
 
   // spots
+  S.mapPts = [];
   for (const r of S.ranked) {
     const [x, y] = P(r.s.lon, r.s.lat), sel = r.s.id === S.sel;
     const p = r.best.p, rad0 = 4 + p / 14;
     const cc = p >= 60 ? col("--heather") : p >= 35 ? col("--dancer") : p >= 15 ? col("--teal") : col("--dim");
+    S.mapPts.push({ id: r.s.id, x, y, r: rad0 });
+    if (r.s.id === hoverId && !sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.globalAlpha = 0.6; c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
     c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
     c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
     if (sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
@@ -959,6 +990,99 @@ function checkAlert() {
 }
 paintToggle();
 if (alertOn) $("alertStatus").textContent = "On. Checking every few minutes while this page is open.";
+
+/* ---------- map: hover for details, click to jump to the list ---------- */
+let hoverId = null, pinned = null, lastPointer = "mouse";
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function hitSpot(e, roomy) {
+  const rc = $("map").getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
+  let hit = null, bd = Infinity;
+  for (const p of S.mapPts || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < p.r + (roomy ? 18 : 8) && d < bd) { bd = d; hit = p; } }
+  return hit;
+}
+function tipRows(r) {
+  const kpT = S.hours ? S.hours.map(kpAt).filter(v => v != null) : [];
+  const kpMax = kpT.length ? Math.max(...kpT) : null;
+  return [
+    ["Best time tonight", r.best.p > 0 ? tf.format(r.best.t) + " · " + r.best.p + "%" : "no window"],
+    ["Cloud then", r.best.cc == null ? "unknown" : Math.round(r.best.cc) + "%"],
+    ["Right now", r.nowH.p + "%"],
+    ["Kp needed here", "≈ " + kpNeed(r.s.lat).toFixed(1)],
+    ["Kp tonight", kpMax != null ? kpMax.toFixed(1) : "unknown"],
+    ["From " + S.townObj.name, r.ferry ? Math.round(r.dist) + " km + ferry" : Math.round(r.dist) + " km · " + driveText(r.mins)]
+  ];
+}
+function showTip(id, mode) {
+  const r = S.ranked.find(x => x.s.id === id), pt = (S.mapPts || []).find(q => q.id === id);
+  if (!r || !pt) return hideTip();
+  const tip = $("tip");
+  tip.textContent = "";
+  const top = document.createElement("div"); top.className = "tip-top";
+  const left = document.createElement("div");
+  const nm = document.createElement("div"); nm.className = "tip-name"; nm.textContent = r.s.name;
+  const ar = document.createElement("div"); ar.className = "tip-area"; ar.textContent = r.s.area;
+  left.append(nm, ar);
+  const pc = document.createElement("div"); pc.className = "tip-pct"; pc.style.color = chanceColor(r.best.p);
+  pc.append(String(r.best.p)); const sm = document.createElement("small"); sm.textContent = "%"; pc.append(sm);
+  top.append(left, pc);
+  const dl = document.createElement("dl"); dl.className = "kv";
+  for (const [k, v] of tipRows(r)) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
+  const note = document.createElement("p"); note.textContent = r.s.note;
+  tip.append(top, dl, note);
+  if (mode === "pin") {
+    const act = document.createElement("div"); act.className = "tip-actions";
+    const go = document.createElement("button"); go.type = "button"; go.className = "btn solid"; go.textContent = "Show in list";
+    go.addEventListener("click", (ev) => { ev.stopPropagation(); goToSpot(id); });
+    const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = "Close";
+    x.addEventListener("click", (ev) => { ev.stopPropagation(); hideTip(); });
+    act.append(go, x); tip.append(act);
+  } else {
+    const h = document.createElement("div"); h.className = "hint"; h.textContent = "Click to find it in the list"; tip.append(h);
+  }
+  tip.classList.toggle("pinned", mode === "pin");
+  tip.hidden = false;
+  if (mode === "pin") { tip.style.left = ""; tip.style.top = ""; return; }
+  const box = $("mapbox").getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let lx = pt.x + pt.r + 14;
+  if (lx + tw > box.width - 10) lx = pt.x - pt.r - 14 - tw;
+  lx = clamp(lx, 10, Math.max(10, box.width - tw - 10));
+  const ty = clamp(pt.y - th / 2, 10, Math.max(10, box.height - th - 10));
+  tip.style.left = lx + "px"; tip.style.top = ty + "px";
+}
+function hideTip() {
+  const had = pinned || hoverId;
+  pinned = null; hoverId = null; $("tip").hidden = true;
+  if (had) drawMap();
+}
+function goToSpot(id) {
+  hideTip();
+  S.sel = id; S.picked = true;
+  renderSpots(); renderTonight(); drawMap();
+  const btn = document.querySelector('.spot[data-id="' + id + '"]');
+  if (!btn) return;
+  btn.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  btn.classList.remove("flash"); void btn.offsetWidth; btn.classList.add("flash");
+  btn.focus({ preventScroll: true });
+}
+const mapEl = $("map");
+mapEl.addEventListener("pointerdown", (e) => { lastPointer = e.pointerType || "mouse"; });
+mapEl.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse" || pinned) return;
+  const p = hitSpot(e, false), id = p ? p.id : null;
+  mapEl.style.cursor = p ? "pointer" : "";
+  if (id !== hoverId) { hoverId = id; drawMap(); }
+  if (p) showTip(p.id, "hover"); else $("tip").hidden = true;
+});
+mapEl.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !pinned) hideTip(); });
+mapEl.addEventListener("click", (e) => {
+  const touchy = lastPointer !== "mouse";
+  const p = hitSpot(e, touchy);
+  if (!p) { if (pinned) hideTip(); return; }
+  if (!touchy || pinned === p.id) { goToSpot(p.id); return; }
+  pinned = p.id; hoverId = p.id; drawMap(); showTip(p.id, "pin");
+});
+document.addEventListener("click", (e) => { if (pinned && !$("mapbox").contains(e.target)) hideTip(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (pinned || hoverId)) hideTip(); });
 
 /* ---------- share (public site only) ---------- */
 if (!window.claude) {
