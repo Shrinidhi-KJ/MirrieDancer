@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a13">
+<meta property="og:title" content="Mirrie Dancers">
+<meta property="og:description" content="Will we see the northern lights in Scotland tonight? Live chances for dark-sky spots, from Shetland to Galloway.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23060a13'/%3E%3Cpath d='M5 24c4-9 6-14 8-14s2 8 5 8 3-10 9-12' fill='none' stroke='%235ff0b0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Mirrie Dancers</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Live northern lights chances for dark-sky spots across Scotland.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a night-sky hero carrying the verdict, then a working field guide: spots + map, tonight's hours, space weather, how to see it. One deliberate dark world. */
+:root {
+  --ink: #060a13;
+  --night: #0b1222;
+  --peat: #121b2f;
+  --loch: #1a2640;
+  --frost: #e9eef6;
+  --mist: #93a1b9;
+  --dim: #5d6a82;
+  --rule: rgba(233, 238, 246, 0.09);
+  --dancer: #5ff0b0;
+  --teal: #3cc6c9;
+  --heather: #b48cff;
+  --rose: #ff7fb0;
+  --whisky: #f4b860;
+  --low: #43506a;
+  --display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+  --body: "Hanken Grotesk", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--ink); }
+body {
+  background: var(--ink);
+  color: var(--frost);
+  font: 400 16px/1.55 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--dancer); text-underline-offset: 3px; }
+a:hover { color: var(--frost); }
+button, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--dancer); outline-offset: 3px; border-radius: 6px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.eyebrow {
+  font: 500 12px/1.2 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+h2 {
+  font: 800 clamp(30px, 4.6vw, 44px)/1 var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 6px 0 0;
+  text-wrap: balance;
+}
+.lede { color: var(--mist); max-width: 62ch; margin: 10px 0 0; }
+
+/* top bar */
+.bar { position: relative; z-index: 3; }
+.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 18px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand b { font: 900 26px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.brand span { color: var(--mist); font-size: 13px; }
+.live { display: flex; align-items: center; gap: 10px; font: 400 12px/1.2 var(--mono); color: var(--mist); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 0 transparent; }
+.dot.on { background: var(--dancer); animation: pulse 2.4s ease-out infinite; }
+.dot.err { background: var(--whisky); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(95, 240, 176, 0.55); } 70% { box-shadow: 0 0 0 9px rgba(95, 240, 176, 0); } 100% { box-shadow: 0 0 0 0 rgba(95, 240, 176, 0); } }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; border: 1px solid var(--rule); border-radius: 999px;
+  padding: 7px 14px; cursor: pointer; color: var(--frost);
+  font: 500 13px/1 var(--body); transition: border-color .2s, background .2s;
+}
+.btn:hover { border-color: rgba(95, 240, 176, 0.5); background: rgba(95, 240, 176, 0.06); }
+.btn.solid { background: var(--dancer); color: var(--ink); border-color: var(--dancer); font-weight: 600; }
+.btn.solid:hover { background: var(--frost); border-color: var(--frost); }
+.btn[disabled] { opacity: .5; cursor: progress; }
+
+/* hero */
+.hero { position: relative; overflow: hidden; margin-top: -64px; padding-top: 64px; isolation: isolate; }
+.hero canvas.sky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+.hero::after { content: ""; position: absolute; inset: auto 0 0; height: 90px; background: linear-gradient(to bottom, transparent, var(--ink)); z-index: -1; }
+.hero .wrap { padding-block: 64px 72px; display: grid; gap: 28px; }
+.verdict {
+  font: 900 clamp(58px, 12.5vw, 150px)/0.86 var(--display);
+  text-transform: uppercase; letter-spacing: 0.005em; margin: 10px 0 0;
+  text-wrap: balance; max-width: 12ch;
+}
+.verdict.glow { background: linear-gradient(100deg, var(--dancer) 10%, var(--teal) 45%, var(--heather) 80%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.quip { font-size: clamp(18px, 2.2vw, 22px); max-width: 46ch; margin: 18px 0 0; color: var(--frost); }
+.why { color: var(--mist); margin: 8px 0 0; max-width: 60ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; padding-top: 22px; border-top: 1px solid var(--rule); }
+.fact { display: grid; gap: 4px; min-width: 0; }
+.fact .v { font: 800 30px/1 var(--display); letter-spacing: 0.02em; }
+.fact .v small { font: 500 13px/1 var(--mono); color: var(--mist); margin-left: 4px; letter-spacing: 0; }
+.notice { border: 1px solid rgba(244, 184, 96, 0.4); background: rgba(244, 184, 96, 0.07); border-radius: 12px; padding: 14px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; max-width: 760px; }
+.notice p { margin: 0; flex: 1 1 280px; min-width: 0; }
+
+section.block { padding-block: 56px; border-top: 1px solid var(--rule); }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 26px; }
+.head > div { min-width: 0; }
+
+/* spots + map */
+.where { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 28px; align-items: start; }
+@media (max-width: 880px) { .where { grid-template-columns: minmax(0, 1fr); } .mapbox { order: -1; } }
+.near { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.near label { color: var(--mist); font-size: 14px; }
+select {
+  background: var(--peat); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 8px 34px 8px 12px; appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--mist) 50%), linear-gradient(135deg, var(--mist) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 55%, calc(100% - 12px) 55%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+}
+.spots { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.spot {
+  width: 100%; text-align: left; cursor: pointer; background: transparent; border: 0;
+  display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 12px 12px; border-radius: 12px; transition: background .15s;
+}
+.spot:hover { background: rgba(233, 238, 246, 0.04); }
+.spot[aria-pressed="true"] { background: var(--peat); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); }
+.pct { font: 800 30px/1 var(--display); text-align: right; letter-spacing: 0.01em; }
+.pct small { font: 500 12px var(--mono); margin-left: 1px; color: var(--mist); }
+.sname { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.smeta { color: var(--mist); font-size: 13px; }
+.tag { font: 500 10.5px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--mist); }
+.tag.pick { border-color: rgba(95, 240, 176, 0.5); color: var(--dancer); }
+.tag.ferry { color: var(--whisky); border-color: rgba(244, 184, 96, 0.35); }
+.when { text-align: right; font: 400 12.5px/1.35 var(--mono); color: var(--mist); }
+.when b { display: block; color: var(--frost); font-weight: 500; font-size: 13.5px; }
+.mapbox { position: relative; background: radial-gradient(120% 90% at 50% 0%, var(--loch), var(--night) 70%); border: 1px solid var(--rule); border-radius: 18px; overflow: hidden; }
+.mapbox canvas { display: block; width: 100%; aspect-ratio: 0.92; max-width: 100%; }
+.legend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 400 11px/1.3 var(--mono); color: var(--mist); pointer-events: none; }
+.ramp { display: inline-block; width: 90px; height: 6px; border-radius: 3px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, rgba(95, 240, 176, 0), rgba(95, 240, 176, .6), var(--heather)); }
+
+/* tonight */
+.tonight { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+@media (max-width: 880px) { .tonight { grid-template-columns: minmax(0, 1fr); } }
+.chart { overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.chart text { fill: var(--mist); font: 400 11px var(--mono); }
+.side { background: var(--peat); border-radius: 16px; padding: 20px; display: grid; gap: 14px; }
+.side h3 { margin: 0; font: 800 24px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+.side p { margin: 0; color: var(--mist); font-size: 14.5px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--mist); }
+.kv dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.keyrow { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font: 400 12px var(--mono); color: var(--mist); }
+.keyrow i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* space weather */
+.sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 880px) { .sw { grid-template-columns: minmax(0, 1fr); } }
+.gauge { background: var(--peat); border-radius: 16px; padding: 20px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.gauge .big { font: 900 56px/0.9 var(--display); letter-spacing: 0.01em; }
+.gauge .big small { font: 500 14px var(--mono); color: var(--mist); margin-left: 6px; }
+.gauge p { margin: 0; color: var(--mist); font-size: 14.5px; }
+.gauge .say { color: var(--frost); font-weight: 600; }
+.kpchart { margin-top: 18px; background: var(--peat); border-radius: 16px; padding: 18px 18px 10px; }
+.kpchart .chart svg { min-width: 620px; }
+
+/* how to */
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 26px 32px; }
+.how h3 { font: 800 22px/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 6px; }
+.how p { margin: 0; color: var(--mist); max-width: 46ch; }
+.how .k { font: 500 12px var(--mono); color: var(--dancer); letter-spacing: 0.06em; }
+
+/* alerts */
+.alerts { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 28px; }
+@media (max-width: 880px) { .alerts { grid-template-columns: minmax(0, 1fr); } }
+.switch { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: var(--peat); border-radius: 16px; padding: 18px 20px; }
+.switch p { margin: 0; flex: 1 1 260px; min-width: 0; color: var(--mist); font-size: 14.5px; }
+.toggle { position: relative; width: 52px; height: 30px; border-radius: 999px; background: var(--low); border: 0; cursor: pointer; transition: background .2s; flex: none; }
+.toggle::after { content: ""; position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: var(--frost); transition: transform .2s; }
+.toggle[aria-checked="true"] { background: var(--dancer); }
+.toggle[aria-checked="true"]::after { transform: translateX(22px); background: var(--ink); }
+.links { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.links li { display: grid; gap: 2px; }
+.links span { color: var(--mist); font-size: 14px; }
+.status { margin-top: 10px; font: 400 12.5px/1.5 var(--mono); color: var(--mist); }
+
+footer { border-top: 1px solid var(--rule); }
+footer .wrap { padding-block: 28px 44px; color: var(--dim); font-size: 13px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+footer p { margin: 0; max-width: 90ch; }
+#src { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+#src span { white-space: nowrap; }
+.ok { color: var(--dancer); } .bad { color: var(--whisky); }
+.muted { color: var(--mist); }
+.skeleton { color: var(--dim); }
+@media (prefers-reduced-motion: reduce) { .dot.on { animation: none; } * { transition: none !important; } }
+</style>
+
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <div class="brand"><b>Mirrie Dancers</b><span>Scotland’s aurora call</span></div>
+    <div class="live">
+      <i class="dot" id="dot"></i><span id="liveText">Reading the sky…</span>
+      <button class="btn" id="refresh" type="button" aria-label="Refresh live data">Refresh</button>
+      <button class="btn" id="share" type="button" hidden>Share</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" aria-labelledby="verdict">
+    <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+    <div class="wrap">
+      <div>
+        <div class="eyebrow" id="heroEyebrow">Tonight near Glasgow</div>
+        <h1 class="verdict" id="verdict">Reading the sky</h1>
+        <p class="quip" id="quip">Pulling the latest from NOAA’s space weather satellites and the cloud forecast.</p>
+        <p class="why" id="why"></p>
+      </div>
+      <div class="notice" id="notice" hidden>
+        <p id="noticeText"></p>
+        <button class="btn solid" id="noticeBtn" type="button" hidden>Allow live data</button>
+      </div>
+      <div class="facts" aria-label="Key numbers">
+        <div class="fact"><span class="eyebrow">Best bet</span><span class="v" id="fBest">–</span></div>
+        <div class="fact"><span class="eyebrow">Peak time</span><span class="v" id="fTime">–</span></div>
+        <div class="fact"><span class="eyebrow">Kp tonight</span><span class="v" id="fKp">–</span></div>
+        <div class="fact"><span class="eyebrow">Bz now</span><span class="v" id="fBz">–</span></div>
+        <div class="fact"><span class="eyebrow">Moon</span><span class="v" id="fMoon">–</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="where" aria-labelledby="whereH">
+    <div class="wrap">
+      <div class="head">
+        <div>
+          <div class="eyebrow">Where to stand</div>
+          <h2 id="whereH">Your nearest dark skies</h2>
+          <p class="lede">Ranked by your chance of seeing it tonight, with the drive factored in. Chance combines the aurora forecast, cloud cover, darkness and how much light pollution each spot has.</p>
+        </div>
+        <div class="near">
+          <label for="town">I’m near</label>
+          <select id="town"></select>
+          <button class="btn" id="locate" type="button">Use my location</button>
+        </div>
+      </div>
+      <div class="where">
+        <ol class="spots" id="spots" aria-label="Viewing spots ranked by chance"></ol>
+        <div class="mapbox">
+          <canvas id="map" aria-label="Map of Scotland showing the aurora oval and viewing spots" role="img"></canvas>
+          <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="ovTime"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="tonightH">
+    <div class="wrap">
+      <div class="head">
+        <div>
+          <div class="eyebrow">Hour by hour</div>
+          <h2 id="tonightH">Tonight at <span id="selName">–</span></h2>
+          <p class="lede">Aurora comes in bursts that last 10 to 30 minutes. Be out, and already dark-adapted, before the best hour.</p>
+        </div>
+      </div>
+      <div class="tonight">
+        <div>
+          <div class="chart" id="hourChart"></div>
+          <div class="keyrow"><span><i style="background:var(--dancer)"></i>Chance to see it</span><span><i style="background:var(--mist);opacity:.35"></i>Cloud cover</span><span><i style="background:var(--loch)"></i>Too light</span></div>
+        </div>
+        <aside class="side" id="selCard">
+          <h3 id="selTitle">–</h3>
+          <p id="selNote"></p>
+          <dl class="kv" id="selKv"></dl>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="swH">
+    <div class="wrap">
+      <div class="head">
+        <div>
+          <div class="eyebrow">Space weather, translated</div>
+          <h2 id="swH">What the sun is doing</h2>
+        </div>
+      </div>
+      <div class="sw">
+        <div class="gauge">
+          <span class="eyebrow">Kp index · global activity</span>
+          <div class="big num" id="gKp">–</div>
+          <p class="say" id="gKpSay"></p>
+          <p>Kp runs 0 to 9. Shetland can see a show from Kp 3. Central Scotland usually needs Kp 5 or more.</p>
+        </div>
+        <div class="gauge">
+          <span class="eyebrow">Bz · magnetic field direction</span>
+          <div class="big num" id="gBz">–</div>
+          <p class="say" id="gBzSay"></p>
+          <p>When Bz points south (negative), solar wind energy pours into Earth’s field. A long negative Bz is when shows suddenly explode.</p>
+        </div>
+        <div class="gauge">
+          <span class="eyebrow">Solar wind speed</span>
+          <div class="big num" id="gWind">–</div>
+          <p class="say" id="gWindSay"></p>
+          <p>Normal is about 400 km/s. Over 500 hits harder. Measured a million miles upstream, so it reaches us 30 to 60 minutes later.</p>
+        </div>
+      </div>
+      <div class="kpchart">
+        <span class="eyebrow">Kp, yesterday to three days ahead (NOAA)</span>
+        <div class="chart" id="kpChart"></div>
+        <div class="keyrow"><span><i style="background:var(--low)"></i>Quiet</span><span><i style="background:var(--teal)"></i>Unsettled</span><span><i style="background:var(--dancer)"></i>Storm G1</span><span><i style="background:var(--heather)"></i>G2</span><span><i style="background:var(--rose)"></i>G3+</span><span id="kpNeedKey"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="howH">
+    <div class="wrap">
+      <div class="head"><div><div class="eyebrow">Why you keep missing it</div><h2 id="howH">How to actually catch it</h2></div></div>
+      <div class="how">
+        <div><div class="k">Look north, low</div><h3>It’s on the horizon</h3><p>From Scotland the aurora usually sits low over the northern horizon, not overhead. Find a spot with nothing in the way to the north: a beach, a loch, a hill.</p></div>
+        <div><div class="k">Your phone sees more</div><h3>Point your camera</h3><p>To the eye a weak aurora looks like a grey-white glow or a cloud that won’t move. A 3 to 10 second night-mode photo shows the green. If the photo’s green, keep watching.</p></div>
+        <div><div class="k">20 minutes</div><h3>Let your eyes adjust</h3><p>Kill the headlights and stay off your bright screen. Full night vision takes about 20 minutes, and one glance at a phone resets it. Turn the brightness right down.</p></div>
+        <div><div class="k">Bursts, not all night</div><h3>Stay out, then stay longer</h3><p>Shows come in surges (substorms) that flare for 10 to 30 minutes, often between 10pm and 2am. Most people miss it by heading home 15 minutes too early.</p></div>
+        <div><div class="k">Clouds beat space</div><h3>Chase the gaps</h3><p>A Kp 7 storm is useless under thick cloud. If your area is socked in, the list above often has a clear spot an hour away.</p></div>
+        <div><div class="k">Dress for 2am</div><h3>Bring the flask</h3><p>Layers, a hat, gloves, something hot to drink, a head torch with a red light. Cold sends people home right before the show starts.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="alertH">
+    <div class="wrap">
+      <div class="head"><div><div class="eyebrow">Never miss it again</div><h2 id="alertH">Get a nudge</h2></div></div>
+      <div class="alerts">
+        <div>
+          <div class="switch">
+            <button class="toggle" id="alertToggle" type="button" role="switch" aria-checked="false" aria-label="Alert me when chances jump"></button>
+            <p id="alertCopy">Alert me when the chance at my best spot passes <b>35%</b>. Works while this page stays open: it checks every few minutes, then sends a notification or plays a chime.</p>
+          </div>
+          <div class="status" id="alertStatus"></div>
+        </div>
+        <div>
+          <ul class="links">
+            <li><a href="https://aurorawatch.lancs.ac.uk/alerts/" target="_blank" rel="noopener">AuroraWatch UK alerts</a><span>Free email and app alerts from Lancaster University, measured over the UK.</span></li>
+            <li><a href="https://www.swpc.noaa.gov/communities/aurora-dashboard-experimental" target="_blank" rel="noopener">NOAA Aurora Dashboard</a><span>The official source behind most of the numbers here.</span></li>
+            <li><a href="https://www.metoffice.gov.uk/weather/specialist-forecasts/space-weather" target="_blank" rel="noopener">Met Office space weather</a><span>The UK forecasters’ daily aurora outlook, written for people, not physicists.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p id="src">Sources loading…</p>
+    <p>Aurora data: NOAA Space Weather Prediction Center (OVATION aurora model, planetary Kp forecast, real-time solar wind). Cloud: Open-Meteo. Chances are a best guess, not a promise. The sky does what it likes.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- data: places ---------- */
+const SPOTS = [
+  { id: "eshaness", name: "Eshaness", area: "Shetland", lat: 60.488, lon: -1.627, sky: 1.0, group: "shetland", note: "Cliff-top with nothing but sea to the north. Shetlanders named the aurora the Mirrie Dancers." },
+  { id: "brodgar", name: "Ring of Brodgar", area: "Orkney", lat: 59.002, lon: -3.230, sky: 0.95, group: "orkney", note: "Neolithic stones under a wide-open northern sky. Unbeatable for photos." },
+  { id: "dunnet", name: "Dunnet Head", area: "Caithness", lat: 58.671, lon: -3.376, sky: 0.95, note: "Mainland Britain’s most northerly point. Park by the lighthouse and face the Pentland Firth." },
+  { id: "callanish", name: "Callanish Stones", area: "Isle of Lewis", lat: 58.198, lon: -6.745, sky: 1.0, group: "lewis", note: "Standing stones, almost no light pollution and a clear view north." },
+  { id: "neist", name: "Neist Point", area: "Isle of Skye", lat: 57.424, lon: -6.789, sky: 1.0, note: "Lighthouse on Skye’s far west tip. A long drive, but very dark." },
+  { id: "chanonry", name: "Chanonry Point", area: "Black Isle, near Inverness", lat: 57.575, lon: -4.094, sky: 0.85, note: "20 minutes from Inverness. Look north-east over the Moray Firth." },
+  { id: "dores", name: "Dores Beach", area: "Loch Ness", lat: 57.381, lon: -4.333, sky: 0.85, note: "Look north-east straight up Loch Ness. Easy parking by the beach." },
+  { id: "tomintoul", name: "Tomintoul & Glenlivet", area: "Cairngorms Dark Sky Park", lat: 57.300, lon: -3.350, sky: 1.0, note: "An official Dark Sky Park and one of the darkest places on the mainland." },
+  { id: "morlich", name: "Loch Morlich", area: "Cairngorms, near Aviemore", lat: 57.167, lon: -3.705, sky: 0.95, note: "Sandy beach on the loch with a clear view north over the forest." },
+  { id: "balmedie", name: "Balmedie Beach", area: "Aberdeenshire", lat: 57.251, lon: -2.052, sky: 0.8, note: "Dunes north of Aberdeen. Walk north along the sand, away from the city glow." },
+  { id: "coll", name: "Isle of Coll", area: "Inner Hebrides", lat: 56.640, lon: -6.560, sky: 1.0, group: "coll", note: "A Dark Sky Island with no street lights at all." },
+  { id: "rannoch", name: "Rannoch Moor", area: "Highlands, on the A82", lat: 56.620, lon: -4.780, sky: 0.95, note: "Huge empty moor. Pull into a lay-by and look north." },
+  { id: "menteith", name: "Lake of Menteith", area: "Trossachs", lat: 56.176, lon: -4.283, sky: 0.85, note: "Flat, quiet loch with an open northern shore. One of the darkest easy trips from Glasgow." },
+  { id: "carron", name: "Carron Valley Reservoir", area: "Behind the Campsies", lat: 56.030, lon: -4.075, sky: 0.85, note: "Tucked behind the Campsies, so the hills block Glasgow’s glow. Look north across the water." },
+  { id: "duckbay", name: "Duck Bay", area: "Loch Lomond, by Balloch", lat: 56.014, lon: -4.618, sky: 0.75, note: "Look straight up Loch Lomond to the north. Busy on big nights, so arrive early." },
+  { id: "campsie", name: "Crow Road, Campsie Fells", area: "North of Glasgow", lat: 56.010, lon: -4.210, sky: 0.7, note: "The closest proper hill to Glasgow. Get above the city glow and face north." },
+  { id: "mugdock", name: "Mugdock Country Park", area: "Milngavie", lat: 55.968, lon: -4.316, sky: 0.65, note: "The quickest dark-ish escape from the city. Good for a phone shot on strong nights." },
+  { id: "whitelee", name: "Whitelee Wind Farm", area: "Eaglesham Moor", lat: 55.680, lon: -4.290, sky: 0.75, note: "A favourite with Glasgow photographers. Glasgow glows to the north, so wait for a strong show." },
+  { id: "arthurs", name: "Arthur’s Seat", area: "Edinburgh", lat: 55.944, lon: -3.162, sky: 0.55, note: "Strong city glow. Only for big storms, but a decent phone photo is possible." },
+  { id: "galloway", name: "Clatteringshaws Loch", area: "Galloway Forest Dark Sky Park", lat: 55.060, lon: -4.280, sky: 1.0, note: "Britain’s first Dark Sky Park. It’s far south, so it needs a strong storm." }
+];
+const TOWNS = [
+  ["Aberdeen", 57.150, -2.094], ["Aviemore", 57.195, -3.825], ["Ayr", 55.458, -4.629], ["Dumfries", 55.070, -3.605],
+  ["Dundee", 56.462, -2.971], ["Edinburgh", 55.953, -3.189], ["Elgin", 57.649, -3.318], ["Fort William", 56.819, -5.105],
+  ["Glasgow", 55.864, -4.252], ["Inverness", 57.478, -4.225], ["Kirkwall", 58.981, -2.960, "orkney"], ["Lerwick", 60.155, -1.145, "shetland"],
+  ["Oban", 56.415, -5.471], ["Perth", 56.396, -3.437], ["Portree", 57.413, -6.196], ["St Andrews", 56.340, -2.796],
+  ["Stirling", 56.117, -3.937], ["Stornoway", 58.209, -6.389, "lewis"], ["Thurso", 58.593, -3.522], ["Wick", 58.438, -3.093]
+].map(([name, lat, lon, group]) => ({ name, lat, lon, group }));
+
+const LAND = "-10041,53600,114,0,58,18,93,-17,79,-1,-18,10,-68,-4,-126,41,-14,44,25,54,-11,16,119,26,39,-10,184,20,-54,20,22,7,3,24,36,16,-29,7,22,29,-22,-7,-169,7,-97,-34,-54,-7,-36,21,36,40,-7,34,47,7,46,-14,26,-34,10,34,-25,19,-14,1,-4,-11,-18,42,-29,3,-21,24,0,30,36,15,-15,11,44,32,-47,0,-7,-22,-58,-26,-47,39,83,14,-43,23,-4,12,25,-7,-46,34,25,-5,14,12,-50,25,-22,7,-14,-12,7,-18,-36,-2,14,-20,-47,-7,18,-35,-28,-7,28,-24,-36,-2,-21,14,32,89,33,27,-33,0,-21,12,28,10,11,26,58,20,11,14,50,-33,33,5,43,-13,-47,-35,-50,15,-8,-21,76,-18,40,24,-8,28,33,20,79,-20,-32,27,39,0,-72,14,-14,32,57,8,80,-20,172,-7,40,7,32,-13,80,-7,61,20,61,-17,14,-24,29,7,0,-34,22,-6,-15,-26,51,-25,18,-46,7,61,43,19,40,64,97,-7,14,7,83,-27,51,0,43,13,25,-11,61,6,29,-8,14,-30,62,-32,61,6,-108,56,25,20,36,-8,18,10,72,-9,-36,21,-65,8,4,19,36,-14,18,7,-7,10,-44,10,-97,0,-3,22,190,71,8,46,21,-29,61,22,94,10,79,24,-61,20,54,27,0,20,43,24,0,25,36,-13,18,40,-7,7,-40,-17,-68,-7,-58,-23,8,30,-33,0,-97,-57,-43,-14,72,41,-15,23,-21,-10,3,22,-14,0,-29,-39,-32,31,-58,-10,-11,-14,-36,10,-75,0,-18,22,-101,19,14,20,-18,19,44,6,7,21,108,42,180,-12,0,7,-69,10,-18,10,15,5,47,2,39,-27,36,0,-54,30,-97,26,68,33,18,-12,72,4,76,-12,-58,24,15,25,54,-2,-22,24,-39,5,-4,-22,-29,2,-54,52,11,7,47,-12,36,14,-90,47,11,12,32,-5,11,10,0,18,29,5,28,29,22,-35,22,28,-18,48,43,55,72,-15,65,15,-15,-37,40,31,83,27,32,38,25,2,25,-12,-54,-35,98,13,7,-32,39,12,-36,-29,33,-1,29,27,-33,50,69,41,-18,-61,18,-13,28,6,54,-22,22,-33,-7,-34,32,49,-32,71,-22,-4,15,-40,-83,30,32,51,36,-4,61,24,47,-27,0,-52,43,-15,47,-66,-14,-24,-101,-42,0,-7,79,2,-11,-22,-108,-61,0,-8,18,5,134,72,61,12,18,29,-4,15,-25,10,14,46,-86,72,36,39,-11,36,47,-5,11,18,61,-17,61,29,33,-25,-26,0,18,-7,44,-7,21,9,-93,50,-4,24,-47,22,15,5,176,-41,79,-59,155,-37,22,5,14,-15,-4,-20,-90,-22,-140,-54,-43,-34,-40,-59,61,8,62,-15,79,5,36,24,7,30,36,34,11,59,79,-20,130,3,115,31,68,3,72,35,83,-15,40,14,25,-4,111,-33,80,13,39,-5,76,-39,7,-66,-22,-38,8,-9,79,-12,-11,-71,79,-23,36,-49,51,-36,18,-54,57,-15,29,-22,-83,61,15,18,32,-5,50,-32,11,-32,-3,-29,-36,-35,-116,-27,-46,-30,-36,-39,21,-27,69,44,90,30,54,-12,118,12,40,-22,22,-61,36,-27,7,-54,39,-30,-28,-49,0,-46,-29,-22,14,-10,-43,-22,-61,66,36,54,-15,54,-90,56,-54,10,8,-15,-22,-25,90,-21,-47,-10,33,-10,14,-56,-36,-61,-47,-27,130,31,29,-17,7,-39,-36,-51,-54,-20,-7,-22,-18,-5,-22,17,-58,3,-126,-18,-10,-91,-22,-36,-144,-67,-58,0,-18,13,29,7,-90,17,-11,18,-75,12,-7,-6,162,-85,-36,-35,-18,-4,-62,22,-136,20,10,-13,-25,-39,0,-64,58,-29,72,-7,-11,-42,32,-25,-21,-15,-4,-26,11,-86,81,-70;-3325,56365,33,-12,61,4,281,74,18,17,47,10,36,-17,36,0,10,-13,-7,-37,-29,-26,29,-1,7,-19,33,-12,93,-5,101,-44,-72,-56,-158,-40,-87,20,-72,-3,-162,-83,-36,-57,-86,-9,-94,-28,-79,-4,-162,27,-86,0,-76,20,-72,41,-18,-5,76,-34,39,-42,33,0,21,-19,90,5,173,-27,72,4,29,-17,180,-7,43,-24,65,4,76,20,57,39,25,2,-14,20,47,29,191,-2,64,-34,-14,-22,54,-5,22,14,198,-76,172,-21,8,-25,50,-20,68,-78,134,-96,54,-59,43,10,32,-27,-21,-7,72,0,64,-27,-3,-20,18,-15,-15,-12,29,-14,-7,-17,25,-23,-3,-108,32,-48,-14,-42,64,-91,-10,-37,36,-73,21,-6,47,-78,50,-36,8,-60,79,-157,50,-32,54,-14,-21,-13,28,-36,-43,-20,7,-12,29,5,18,-13,15,33,36,-22,316,-64,252,-99,15,-41,72,-47,32,-76,47,-49,94,-31,14,-40,29,-17,122,-29,36,-18,-90,-29,-32,-22,-22,-39,69,-123,284,-257,14,-33,-16,-10,2,11,-101,36,-57,-19,-69,3,-39,16,-94,72,-36,17,-43,4,-126,-26,-115,-5,-33,19,-57,5,-90,-32,32,-14,14,15,58,11,90,-36,43,17,180,20,29,-7,90,-87,52,-20,-2938,0,53,53,122,83,-86,0,-36,10,-25,24,3,108,-14,29,39,25,108,22,22,-8,32,21,-14,12,36,21,4,16,-65,-13,-22,32,58,46,47,18,18,26,-58,69,43,18,15,37,-26,-27,-82,-35,-36,-32,-58,5,-18,52,-32,10,-15,-60,-83,-61,0,-37,-36,28,-61,21,11,32,-18,28,32,7,11,83,-18,-5,-18,-36,11,-20,-76,-10,-100,86,-8,68,-25,6,-194,161,126,209,39,14,29,25,0,37,51,85,43,20,39,-17,51,14,-61,20,39,23,65,11,90,-21,101,21,-69,0,0,8,69,7,0,7,-29,6,-83,-13,-320,13,-47,10,-25,-15,-43,19,-15,-27,15,-32,-11,-53,-18,-6,-119,3,-22,-22,-72,7,8,-7,-18,-3,-11,10,11,13,10,-6,-7,13,-25,-20,7,-14,-21,-8,25,-24,-133,-49,-47,-3,-40,10,4,46,-15,8,-28,-22,7,-34,-40,-3,-50,19,-36,35,11,39,-40,-24,-32,-3,-87,27,-29,39,-18,3,-21,-39,21,-44,47,-8,15,-22,-15,-24,15,-15,-15,-13,11,-41,-36,-22,-79,22,-36,-2,-97,75,-188,59,-18,27,-57,5,-47,-15,-50,-41,14,-42,47,-64,25,-14,11,-57,-97,27,0,69,-33,7,-14,35,-33,12,-122,96,-25,75,11,55,46,7,11,15,51,-55,-4,-36,18,-20,36,-10,18,10,7,15,-61,91,40,115,140,81,32,63,4,47,61,37,22,46,101,33,32,48,-32,42,-36,7,18,18,-26,42,-126,32,8,17,-108,54,57,49,-21,65,-4,97,36,29,50,10,130,-25,166,-14,25,9,-151,18,-44,16,-50,37,-40,8,-36,24,-25,47,-14,2,-4,-17,65,-71,-25,-10,-47,7,-14,77,39,58,72,64,0,19,-97,-95,-29,8,-14,54,-15,4,-10,-10,32,-88,-18,-25,11,-65,-11,-5,-50,12,43,-35,-72,-91,-43,3,-15,10,-29,74,-54,53,-14,-9,54,-71,0,-30,-86,35,-11,34,-29,-52,-32,-26,43,-60,-97,20,-44,61,18,45,-14,39,133,122,101,32,61,66,101,35,22,25,-54,-28,-90,-21,-36,-47,-130,-52,-83,-71,-32,-7,-25,-42,-65,2,-11,17,-11,-73,25,-7,36,-74,-10,-9,79,-57,7,-25,-18,-21,-50,-11,-58,-39,-25,-58,-22,-10,33,-66,-29,-10,7,-18,-29,-32,0,-34,-50,-49,-25,-7,32,-13,40,-41,-11,-15,-51,-37,-43,-15,-65,5,-43,-16,-47,5,-10,12,-15,66,7,20,76,49,-7,66,14,29,-14,22,50,76,-11,34,58,25,25,42,94,47,50,56,-144,-81,-14,0,7,14,-54,20,-14,47,104,90,-101,-48,-25,29,126,122,-14,3,-40,-17,-50,-47,-15,-39,-18,5,11,39,119,115,47,-10,-29,44,50,57,-29,-5,-68,-42,58,76,-11,13,68,31,-21,10,-69,-22,-14,22,32,71,22,11,43,-5,50,12,-90,0,29,41,33,12,21,28,33,9,100,5,116,-9,90,61,54,58,-137,-103,-151,11,-26,-15,-18,7,-14,39,-47,-34,-14,5,43,63,22,-14,50,-5,112,46,-69,-12,-47,-21,-54,12,51,63,65,40,-22,14,32,13,40,0,29,15,65,-8,158,35,-166,-20,-79,20,119,102,-112,-58,-36,-47,-72,-20,-46,-37,-36,-9,-69,-40,-108,-78,-75,-32,-18,17,-76,24,22,33,-47,-28,-61,8,-148,68,-4,23,8,9,64,3,69,-12,29,-15,7,7,-36,27,108,40,111,-20,105,15,-115,-5,-94,24,-144,-41,-61,15,-69,-3,-75,10,-25,0,-36,-18,-47,10,-29,25,4,15,54,27,151,9,65,20,111,-37,-7,22,-29,15,51,-7,36,15,43,-8,-72,22,-22,24,119,15,72,29,-32,1,-33,-22,-57,7,46,34,-43,5,-93,-12,-47,7,68,7,-29,21,65,88,61,17,26,-3,54,-41,50,-6,101,20,0,7,-105,-12,-57,18,7,26,-22,8,-43,-7,-36,16,-11,6,15,17,54,41,47,1,28,12,90,-30,155,7,-18,13,-122,-13,-43,27,-83,13,-15,10,58,59,-18,17,65,34,36,3,97,-47,40,7,-54,17,-44,30,62,42,-26,5,-39,-27,-72,-20,-79,14,-65,-7,-7,13,28,36,47,22,18,-15,22,1,111,31,47,22,7,28,-18,2,-97,-61,-75,10,32,16,-18,28,-83,-57,-75,-12,-26,7,-18,39,15,5,-15,17,15,27,-47,10,-14,40,25,66,18,0,-7,20,50,-3,137,-64,-4,20,115,2,26,8,-76,19,-43,-4,-29,-13,-32,22,10,13,-32,4,-47,50,-43,9,-7,13,29,24,-8,17,58,12,40,-17,18,18,-33,21,-97,13,4,110,50,20,54,-3,22,-10,14,-68,40,-22,14,0,-18,22,40,-7,0,46,-65,47,11,10,-15,7,40,34,25,-14,40,0,-8,-27,69,-32,32,-3,18,45,22,11,122,-48,72,-15,-97,52,-76,21,0,17,22,-5,7,11,69,-33,39,6,58,-17,79,-30,50,-35,-25,38,-126,51,29,14,-11,25,-90,20,-39,27,-26,4,-7,17,-61,3,14,20,-36,32,22,14,36,-5,25,-27,22,10,43,-5,25,15,-14,35,14,7,-21,7,54,13,0,7,-62,7,8,7,-33,13,7,20,-25,6,-47,37,4,17,97,-21,79,21,44,-11,43,21,61,-21,65,0,68,-28,-47,28,54,14,-82,7,-40,-12,-47,17,-75,69,0,8,18,0,-11,21,21,40,87,-29,39,2,-28,12,-11,22,-43,-7,14,14,-22,8,58,17,54,-17,-112,51,0,18,80,38,21,74,18,10,151,-24,33,-45,-15,-34,26,17,18,66,46,-31,69,-22,-7,-23,-47,-26,-47,-59,148,78,28,49,26,7,82,-16,51,-18,0,-22,-69,-76,62,35,0,12,90,42,36,9,72,-22,-15,7,29,20,54,-3,18,16,68,-3,51,34,25,-25,108,-6,86,7,112,39,101,17,54,-7,-11,-7,22,-11,86,11,83,-13,14,20,-36,10,-29,24,40,22,18,-2,18,-27,133,14,54,-21,97,7,36,-8,-28,-53,-83,-74,11,-29,61,-6,-29,-64,-133,-109,-166,-40,-54,-29,-32,-42,-43,-25,-220,-97,-76,-20,-50,-54,-130,-37,-10,-25,-22,6,7,7,-68,15,7,-22,61,-10,29,-23,-22,-19,0,-22,-61,7,-36,-22,-111,22,-83,-12,-94,46,87,-58,39,-5,61,14,58,-31,14,2,-3,15,97,-29,58,26,50,-17,-14,-14,32,-5,72,27,43,32,22,-10,-11,-25,-198,-135,-36,2,7,25,-29,15,-122,-49,-126,-8,-14,-26,-98,-45,-25,-32,51,11,50,38,126,49,32,-12,76,-5,86,30,-18,-34,-93,-62,14,-14,-65,-8,-18,-12,11,-10,-86,3,0,-8,57,-5,-43,-41,54,-6,47,27,32,3,33,22,50,13,-50,29,248,7,151,61,62,8,-22,-20,11,-7,43,7,-22,27,76,-7,32,17,15,34,29,-4,54,14,122,-2,76,-27,129,-25,87,7,75,27,159,0,28,-14,72,9,116,-16,18,-13,28,13,65,-13,72,13,33,-8,32,22,86,-20,83,27,130,0,21,-27,44,6,100,-69,36,-69,-7,-19,40,-27,-15,-1,-3,-17,21,-7,-72,-47,-18,-32,-133,-75,-93,-165,25,-36,-137,-133,-14,-35,10,-41,-28,-37,-51,-25,-65,-56,-90,-39,-61,-98,0,-34,-29,-28,-108,-49,-18,-21,-57,-18,-40,-37,-25,8,-299,-24,-72,-23,-104,-61,-43,-8,-44,6;-5031,55749,22,-20,-18,-5,-22,25,-65,35,-25,58,-43,20,-18,49,32,10,87,-42,7,-22,47,-37,14,-51,-18,-20;-7263,57483,0,-12,25,5,36,-13,-61,-14,4,-10,54,-13,0,-7,-87,-14,-104,29,-7,31,32,25,108,-7;-6064,57346,-15,26,18,81,44,10,-18,27,10,7,29,-7,-14,22,18,-5,11,-9,-36,-111,28,-39,-64,-22,-18,7,7,13;-3004,59128,-61,5,-51,25,-3,19,18,13,54,7,18,-15,75,2,-21,-21,0,-28,-29,-7;-9963,53954,22,7,18,-7,-15,-61,-21,-12,-58,32,-40,0,-11,54,-122,-3,-76,10,0,7,47,5,29,30,18,-8,14,8,22,-16,72,23,87,-1,21,-6,18,-27,-18,0,-7,-35;-4613,54057,-8,13,-36,-6,-46,22,-62,-27,-25,5,54,61,25,96,98,44,82,101,90,39,54,10,36,-2,-25,-64,11,-25,40,-14,14,-23,-54,-53,-32,-12,7,-27,-87,-42,4,-12,-58,-22,-18,-18,-43,-10,-21,-34;-5071,55509,-21,-8,14,-46,-39,-15,-101,-2,-87,24,-39,20,-15,49,15,19,-43,40,-8,56,40,44,65,18,-7,16,36,0,64,-19,51,-51,21,-49,-14,-13,43,-25,4,-22,-25,-4,-4,-17,50,-15;-6032,55729,7,-48,-32,-22,-7,9,-69,-36,-82,-5,-11,-25,-61,-24,-26,5,-7,46,76,30,-33,44,-46,12,3,19,69,44,-51,8,-47,-12,-39,-52,-76,-47,-29,-4,-10,10,14,34,-14,9,54,54,-33,13,22,12,14,46,115,42,11,-4,-18,-42,25,-27,-7,27,22,22,158,74,18,-11,22,-129,50,-35,-7,-24,25,-13;-5798,56112,83,41,22,-6,3,-35,-50,-35,-148,-190,-57,-28,-18,-54,-26,-10,-39,1,-33,14,-25,72,11,34,79,36,76,8,32,17,-93,-7,-15,15,11,24,61,47,51,14,75,42;-7245,57326,32,-22,18,2,-61,-69,-21,-5,-76,11,0,-6,83,-21,11,-37,-11,-30,-36,7,-40,0,0,-7,69,0,61,-29,-22,-20,-83,10,-32,-10,-29,18,-36,63,4,35,-40,21,65,76,-40,74,76,22,90,-36,-36,0,0,-6,76,-27,-26,-9,-21,7,-101,49,-22,-7,22,-25,50,-9,29,-18,47,-2;-7130,57654,54,-7,11,-14,-32,-25,-72,34,-47,0,0,-9,18,-1,-4,-19,36,-3,11,-22,50,5,-21,-22,-112,-19,-18,21,-57,-21,0,-8,133,10,36,-5,11,-10,-26,-27,-79,-9,-68,9,-40,32,29,8,-126,27,-22,-13,-79,27,69,69,21,-7,69,7,-29,-13,18,-14,83,54,-18,-27,75,-13,-21,13,97,27,14,-18,-21,-16,57,-1;-3249,58792,119,15,-25,-20,-51,-9,-93,2,-80,74,0,20,-43,0,-11,11,18,23,65,21,105,-33,54,-42,-15,-13,33,-21,-44,-6,-32,-22;-2727,58971,14,-4,8,-35,-80,-22,-39,-29,-101,24,-58,56,-39,-21,-61,4,14,-15,-32,1,-18,-15,-22,7,-61,-5,-36,33,32,55,-21,33,-18,-8,3,-19,-32,0,18,-34,-33,-27,-36,7,-28,26,-15,33,25,37,-7,44,25,31,94,20,76,-5,32,-19,50,0,26,-16,-22,-7,76,-27,-15,-7,15,-7,-69,-10,-29,-32,-39,-13,14,-7,58,-7,47,27,36,-19,43,12,36,-20,18,7,-7,-21,21,-3,33,14,50,3,0,-17,-58,-24,44,-23,21,2,-21,28,68,14;-2831,59197,46,0,-7,41,15,15,18,0,-11,-15,36,-4,7,-10,-32,-30,0,-29,25,-17,-54,-3,-15,23,-28,7,0,22;-3047,59320,-29,14,68,0,43,27,18,-12,-18,-8,4,-14,-25,0,0,-7,90,-17,25,-32,32,-6,8,-12,-33,-5,-21,-17,14,27,-76,34,-28,1,14,-22,-14,7,-15,-12,-18,5,-39,49;-988,60698,-4,-62,-72,27,51,-48,-29,-6,-25,6,3,-11,43,-11,11,-15,0,-13,-32,-12,18,-51,-69,5,-3,9,-11,-10,11,-14,-36,4,-36,35,-4,115,33,3,10,-30,26,-4,-22,44,7,48,25,28,15,0,11,-17,28,16,47,-2,-11,-29,15,-5;-905,60685,-62,5,0,35,18,-7,-3,34,25,17,-11,30,69,46,10,-32,-32,-20,29,5,39,50,51,-15,11,-20,-26,-7,26,-7,-47,-20,7,-20,-22,0,22,-14,-50,-27,28,-33,-14,-9,-68,9;-8527,55009,29,-8,15,-25,-65,-7,-18,7,3,11,18,29,18,-7;-6205,56104,22,-2,0,17,47,6,3,-13,-43,-51,0,-17,-18,-8,-54,-5,-21,7,64,66;-5632,56264,11,-7,7,7,3,-15,-18,-29,-7,-30,-32,32,36,42;-5632,56318,47,8,-22,-28,7,-14,-21,-8,-18,7,7,35;-6161,56470,-76,0,-25,13,21,17,26,4,54,-34;-5960,57284,-47,20,-7,14,25,8,58,-19,7,-15,-36,-8;-6874,58216,14,7,-21,13,0,22,21,-5,51,-20,18,-24,-83,0,0,7;-2543,59121,0,-19,28,-8,-18,-10,-64,-10,-4,22,-32,13,-18,-8,3,-15,-21,-4,-18,7,21,19,43,8,4,12,-36,23,43,11,-7,-14,50,-5,-25,-5,11,-17,47,7,-7,-7;-783,60615,25,-8,-3,-19,-26,-11,-82,11,14,-20,-29,2,-54,59,115,0,15,-20,25,6;-1316,60094,11,-7,-29,-44,0,34,-32,-32,29,49,-8,15,29,7,0,-22;-2054,60156,7,-27,-18,-12,-46,21,25,18,32,0;-1064,60165,15,5,-4,-22,-32,-43,-36,17,3,34,-18,12,0,10,40,-2,18,12,14,-23;-920,60386,4,-9,-61,-37,-36,-7,-22,7,11,9,18,20,86,17;-6820,56538,79,10,11,-17,-15,-14,-57,-3,-22,-27,-47,-7,-18,-18,8,-17,-83,15,-25,44,169,34;-6460,56678,-36,-44,-33,-7,-86,-52,-54,3,-7,-20,-25,28,54,17,57,49,83,34,43,5,4,-13;-7393,57010,18,-27,-28,0,-58,-40,-97,10,29,24,18,15,-15,18,69,22,7,27,36,-15,-22,-20,43,-14;-6323,57059,72,-32,-18,-17,25,0,-33,-57,-64,-12,-36,30,-80,33,62,38,72,17;-2954,58841,69,-9,-36,-35,10,-49,-28,-17,-47,27,11,13,-40,41,36,-3,11,11,-69,6,83,15;-2446,59293,36,26,18,-34,-69,-5,-43,-46,-11,-3,0,22,-61,-29,7,20,-36,0,-57,-37,-18,4,-7,-21,0,27,61,41,32,7,4,13,-22,15,90,14,-54,-36,15,-6,68,25,47,3;-5690,56434,33,-33,-47,-7,-18,19,-22,1,4,-13,-43,-36,32,12,54,-2,-22,-22,-90,-33,-39,-7,-33,13,29,17,0,10,-21,6,-26,-6,-14,-18,-126,-31,-25,-15,-40,9,-43,-14,-94,0,-25,-20,-79,24,-22,33,11,16,65,8,43,-34,18,15,-21,7,64,-2,101,22,65,29,-7,5,-126,-28,-25,1,-26,20,47,27,22,36,115,22,18,15,-14,24,-112,-29,-65,49,-93,8,-51,21,47,18,-32,36,68,13,25,-12,11,24,68,20,94,-11,-7,-21,32,-1,69,-93,111,-2,22,-14,36,7,36,-27,47,-5,28,-34,36,-3,-7,-20,-36,6;-6565,57346,-14,-6,-115,25,-22,12,-14,40,-43,17,-11,22,61,0,-25,32,32,25,69,-54,39,-15,7,26,-32,28,22,14,46,-9,-36,34,-54,15,26,24,-11,32,68,-25,7,-24,101,-47,43,7,-21,-31,43,32,86,-57,-10,34,-65,55,29,41,-40,7,-18,45,50,19,29,35,25,4,159,-114,21,-113,-14,-50,-40,-32,62,15,-11,-51,36,-25,-54,-27,86,7,25,-12,-36,-24,72,10,29,-17,54,-3,18,-19,18,-6,22,15,43,0,29,15,54,5,18,-12,75,0,-18,-25,8,-17,-69,-51,-57,-6,-18,-43,-51,-20,-83,-62,-72,-12,-25,15,4,19,29,22,10,33,47,38,97,32,-57,-12,-83,-2,-58,56,18,-34,-18,-35,-46,-34,-36,69,-15,-8,-36,15,15,-15,-15,-7,-144,-20,43,42,-68,-15,-36,35,36,20,-65,0,-72,70,65,22,79,-34,25,-4,-10,14,-83,40,-58,-5,15,14,-26,7,0,33,-50,-20,-7,36,-40,-29,7,-41;-6953,57743,-29,-8,-144,96,0,7,29,0,18,-26,93,53,72,3,-50,27,83,19,50,-12,-36,20,29,14,-58,0,-39,18,-76,2,-25,5,-7,15,-22,-5,-47,19,40,22,21,0,-7,13,123,27,-123,-13,11,13,22,0,0,7,-26,0,26,20,-51,-17,-36,37,-14,26,32,44,-18,13,94,7,-36,12,3,32,18,12,126,-29,0,-7,-28,2,3,-14,36,-25,7,-35,29,-31,0,29,-29,34,18,20,72,13,62,-33,28,20,-36,13,-10,29,-29,0,-29,34,18,13,-25,7,104,54,159,29,32,24,180,70,79,49,43,-11,58,-80,-29,-12,-21,-40,46,-14,0,-8,-82,-34,-4,-18,-61,-26,-11,-28,-40,-2,18,-17,80,-5,75,35,43,7,-10,-42,-72,-32,-166,25,32,-47,-7,-20,-68,-14,-47,-29,-36,7,-25,-13,-69,-7,0,-7,36,0,177,27,39,-47,-32,-14,47,-6,-72,-36,-123,14,4,-12,72,-19,14,-17,-50,-33,-43,6,14,-20,-25,-7,-32,11,-36,30,10,-41,-43,14,-47,74,15,27,29,15,72,7,0,7,-94,0,-7,-19,-69,-37,33,-40,57,-34,-21,-7,25,-13,7,-29,-126,18,-18,-18,43,-12,22,-37,-50,-5,7,-14,-69,21,-7,-7,22,-14,-51,-27,15,-6,-79,-36;-1096,60416,25,29,36,5,-90,-66,7,-10,51,22,-4,-37,-101,-12,97,-25,-64,-31,3,-15,47,-3,-58,-24,-46,24,7,-27,-33,-7,0,-7,40,0,-22,-27,44,20,-36,-49,39,17,11,-5,-14,-18,32,-21,-25,0,7,-13,-18,5,-40,-12,15,-7,-25,-22,25,-6,-7,-24,28,-10,-21,-22,-33,2,18,-54,-46,11,3,-42,-25,-32,-7,7,14,-22,-14,-54,-18,20,-18,-8,11,23,-62,7,-14,12,22,37,32,7,-25,25,25,0,-7,19,68,120,-7,27,-22,13,22,29,-29,-9,-14,5,43,65,-18,0,-43,-41,-29,39,-50,15,61,-47,-7,-15,-44,15,-7,-32,-14,10,-11,-5,-14,-29,-51,14,-32,23,18,17,43,7,-36,27,-32,-34,-15,20,-65,-15,-18,15,-28,4,-29,50,32,22,54,7,54,-20,-7,13,36,-6,-7,13,47,4,21,-38,15,7,-15,20,22,0,-7,16,21,5,51,-19,10,-22,26,20,-26,16,18,25,29,-5,-11,10,65,3,-75,19,-8,22,-28,-15,-22,8,11,34,-54,8,-7,61,-36,-35,-18,12,18,16,-36,-3,-33,10,-21,-15,-40,7,14,23,40,5,29,44,14,2,58,-49,39,-7,33,10,-51,7,-46,20,28,29,44,12,-11,29,54,3,50,-19,-7,27,22,22,10,-18,0,-24,-18,-12,8,-23,-36,-32,21,0,-21,-7,21,-7,-21,-34,36,14,7,-7,-15,-35,-18,-4,-43,-50,47,6,0,19,25,10,65,5,-61,29,32,10,0,-17,43,32,33,-15,-7,-10,25,-9,18,-32,-36,0,-40,-20,40,5,-15,-13,36,10,22,-24,40,42,7,-15";
+
+/* ---------- small helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const sig = (x) => 1 / (1 + Math.exp(-x));
+const rad = (d) => d * Math.PI / 180;
+const HOUR = 3600000;
+const tf = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+const hf = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", timeZone: "Europe/London" });
+const df = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "Europe/London" });
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("mirrie." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("mirrie." + k, JSON.stringify(v)); } catch (e) { /* storage blocked: fine */ } }
+};
+function km(a, b) {
+  const R = 6371, dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function driveText(mins) {
+  if (mins < 10) return "on your doorstep";
+  if (mins < 60) return Math.round(mins / 5) * 5 + " min";
+  const h = Math.floor(mins / 60), m = Math.round((mins % 60) / 15) * 15;
+  return m === 60 ? (h + 1) + "h" : h + "h" + (m ? " " + m : "");
+}
+function sunAlt(t, lat, lon) {
+  const d = t / 86400000 - 10957.5;
+  const g = rad(357.529 + 0.98560028 * d), q = 280.459 + 0.98564736 * d;
+  const L = rad(q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g));
+  const e = rad(23.439 - 0.00000036 * d);
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+  const dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const gmst = ((18.697374558 + 24.06570982441908 * d) % 24 + 24) % 24;
+  const H = rad(gmst * 15 + lon) - ra;
+  return Math.asin(Math.sin(rad(lat)) * Math.sin(dec) + Math.cos(rad(lat)) * Math.cos(dec) * Math.cos(H)) * 180 / Math.PI;
+}
+function moon(t) {
+  const P = 29.530588853, age = (((t - 947182440000) / 86400000) % P + P) % P;
+  const illum = (1 - Math.cos(2 * Math.PI * age / P)) / 2;
+  const name = age < 1.5 || age > 28 ? "New" : age < 6.4 ? "Waxing crescent" : age < 8.4 ? "First quarter" : age < 13.8 ? "Waxing gibbous" : age < 15.8 ? "Full" : age < 21.1 ? "Waning gibbous" : age < 23.1 ? "Last quarter" : "Waning crescent";
+  return { illum, name };
+}
+/* Kp needed for a show on the northern horizon, by latitude (rough, Scotland-tuned) */
+const kpNeed = (lat) => clamp(3 + (60.2 - lat) * 0.62, 2.5, 7.5);
+function gScale(kp) { return kp >= 9 ? "G5" : kp >= 8 ? "G4" : kp >= 7 ? "G3" : kp >= 6 ? "G2" : kp >= 5 ? "G1" : null; }
+function kpColor(kp) { return kp >= 7 ? "var(--rose)" : kp >= 6 ? "var(--heather)" : kp >= 5 ? "var(--dancer)" : kp >= 4 ? "var(--teal)" : "var(--low)"; }
+function chanceColor(p) { return p >= 60 ? "var(--heather)" : p >= 35 ? "var(--dancer)" : p >= 15 ? "var(--teal)" : "var(--dim)"; }
+
+/* ---------- live data: direct from source, else through the viewer's Firecrawl connector ---------- */
+const URLS = {
+  kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
+  mag: "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json",
+  wind: "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json",
+  ov: "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
+  wx: "https://api.open-meteo.com/v1/forecast?latitude=" + SPOTS.map(s => s.lat).join(",") + "&longitude=" + SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT"
+};
+const mcpReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("mcp").catch(() => null) : Promise.resolve(null);
+const via = {}; // per source: "live" | "snapshot" | "connector"
+async function getJSON(key) {
+  try {
+    const r = await fetch(URLS[key], { cache: "no-store" });
+    if (r.ok) { const j = await r.json(); via[key] = "live"; return j; }
+  } catch (e) { /* blocked or offline: try the snapshot */ }
+  try {
+    const r = await fetch("data/" + key + ".json", { cache: "no-store" });
+    if (r.ok) { const j = await r.json(); via[key] = "snapshot"; return j; }
+  } catch (e) { /* no snapshot here */ }
+  const mcp = await mcpReady;
+  if (!mcp) throw Object.assign(new Error("No route to live data"), { code: "no_route" });
+  const res = await mcp.callTool("Firecrawl", "firecrawl_scrape",
+    { url: URLS[key], formats: ["rawHtml"], maxAge: 0, objective: "Read live aurora and cloud data for a Scotland northern lights forecast page" },
+    { cache: { staleTime: 240000, gcTime: 3600000 } });
+  const p = res && res.payload;
+  const raw = typeof p === "string" ? p : p && (p.rawHtml ?? (p.data && p.data.rawHtml));
+  if (typeof raw !== "string") throw Object.assign(new Error("Empty reply"), { code: "bad_payload" });
+  via[key] = "connector";
+  return JSON.parse(raw);
+}
+const usesConnector = () => Object.values(via).includes("connector");
+
+const S = {
+  kp: null, bz: null, bt: null, wind: null, windAt: null, ov: null, ovAt: null, wx: null,
+  status: {}, updated: null, pageErr: null,
+  town: store.get("town", "Glasgow"), here: null, sel: null, ranked: [], best: null
+};
+
+function parseKp(j) {
+  let rows = j;
+  if (Array.isArray(j) && Array.isArray(j[0])) { // older array-of-arrays format with a header row
+    const h = j[0];
+    rows = j.slice(1).map(r => Object.fromEntries(h.map((k, i) => [k, r[i]])));
+  }
+  return rows.map(r => ({ t: Date.parse(String(r.time_tag).replace(" ", "T") + (/Z$/.test(r.time_tag) ? "" : "Z")), kp: parseFloat(r.kp), kind: r.observed || "", g: r.noaa_scale || null }))
+    .filter(r => isFinite(r.t) && isFinite(r.kp)).sort((a, b) => a.t - b.t);
+}
+function parseOv(j) {
+  const grid = new Float32Array(360 * 181);
+  for (const c of j.coordinates || []) {
+    const lo = ((Math.round(c[0]) % 360) + 360) % 360, la = Math.round(c[1]) + 90;
+    if (la >= 0 && la <= 180) grid[lo * 181 + la] = c[2];
+  }
+  return grid;
+}
+function ovAt(lon, lat) {
+  if (!S.ov) return null;
+  const lo = ((Math.round(lon) % 360) + 360) % 360, la = clamp(Math.round(lat) + 90, 0, 180);
+  return S.ov[lo * 181 + la];
+}
+/* how much aurora is visible from a spot: oval overhead or up to ~1000 km to the north */
+function ovView(s) {
+  if (!S.ov) return null;
+  let best = 0;
+  for (let dl = 0; dl <= 10; dl++) for (let dx = -1; dx <= 1; dx++) best = Math.max(best, ovAt(s.lon + dx, s.lat + dl) * (1 - dl / 13));
+  return best;
+}
+function kpAt(t) {
+  if (!S.kp) return null;
+  for (let i = S.kp.length - 1; i >= 0; i--) if (S.kp[i].t <= t) return t - S.kp[i].t < 3 * HOUR ? S.kp[i].kp : null;
+  return null;
+}
+function cloudAt(i, t) {
+  const w = S.wx && S.wx[i];
+  if (!w) return null;
+  const k = Math.round((t - w.t0) / HOUR);
+  const v = w.cc[k];
+  return v == null ? null : v;
+}
+
+/* ---------- the model ---------- */
+function score(s, i, t, now) {
+  const kp = kpAt(t);
+  let act = kp == null ? 0 : sig(1.5 * (kp - kpNeed(s.lat)));
+  const ahead = (t - now) / HOUR;
+  const ov = ovView(s);
+  if (ov != null && ahead > -1 && ahead < 1.5) act = 0.45 * act + 0.55 * clamp(ov / 22);
+  if (S.bz != null && ahead > -1 && ahead < 2) act = clamp(act + (S.bz <= -10 ? 0.22 : S.bz <= -5 ? 0.12 : S.bz <= -2 ? 0.05 : S.bz >= 5 ? -0.08 : 0));
+  const alt = sunAlt(t, s.lat, s.lon);
+  const dark = alt <= -12 ? 1 : alt >= -6 ? 0 : (-6 - alt) / 6;
+  const cc = cloudAt(i, t);
+  const clear = cc == null ? 0.6 : Math.pow(1 - cc / 100, 1.3);
+  return { t, p: Math.round(100 * act * dark * clear * s.sky), act, dark, clear, cc, kp };
+}
+function nightHours(now) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now).map(p => [p.type, p.value]));
+  const localHour = +parts.hour;
+  const offset = Date.UTC(+parts.year, +parts.month - 1, +parts.day, localHour) - Math.floor(now / HOUR) * HOUR;
+  const dayStartUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offset;
+  const start = dayStartUtc + (localHour >= 8 ? 16 : -8) * HOUR;
+  return Array.from({ length: 17 }, (_, k) => start + k * HOUR);
+}
+function compute() {
+  const now = Date.now();
+  const hours = nightHours(now);
+  const cur = Math.floor(now / HOUR) * HOUR;
+  const town = S.here || TOWNS.find(t => t.name === S.town) || TOWNS[8];
+  S.hours = hours;
+  S.ranked = SPOTS.map((s, i) => {
+    const series = hours.map(t => score(s, i, t, now));
+    const future = series.filter(h => h.t >= cur);
+    const best = future.reduce((a, b) => (b.p > a.p ? b : a), future[0] || series[series.length - 1]);
+    const nowH = series.find(h => h.t === cur) || score(s, i, cur, now);
+    const dist = km(town, s);
+    const mins = dist * 1.3 / 62 * 60;
+    const ferry = !!s.group && s.group !== town.group;
+    const worth = best.p - Math.min(45, mins / 60 * 8) - (ferry ? 40 : 0);
+    return { s, i, series, best, nowH, dist, mins, ferry, worth };
+  }).sort((a, b) => b.worth - a.worth || a.dist - b.dist);
+  if (!S.picked || !SPOTS.some(s => s.id === S.sel)) S.sel = S.ranked[0].s.id;
+  S.townObj = town;
+}
+
+/* ---------- rendering ---------- */
+const TIERS = [
+  { min: 55, word: "They’re oot. Go.", glow: true, quip: "Get somewhere dark, face north and give your eyes 20 minutes. Take the camera." },
+  { min: 32, word: "Worth a look tonight", glow: true, quip: "Keep your boots by the door. Check back after dark and be ready to move." },
+  { min: 14, word: "Long shot", glow: false, quip: "Your phone camera might catch a glow low on the northern horizon. Your eyes probably won’t." },
+  { min: -1, word: "Stay in. Kettle on.", glow: false, quip: "Nothing worth the drive tonight. Turn on the alert below and we’ll shout if that changes." }
+];
+function renderHero() {
+  const top = S.ranked[0];
+  const town = S.townObj;
+  $("heroEyebrow").textContent = "Tonight near " + town.name;
+  const any = S.kp || S.wx;
+  if (!any) {
+    $("verdict").textContent = "Sky unreadable";
+    $("verdict").classList.remove("glow");
+    $("quip").textContent = "The live feeds didn’t answer, so there’s no call to make yet.";
+    $("why").textContent = "";
+    return;
+  }
+  const nowBest = Math.max(...S.ranked.map(r => r.nowH.p));
+  const p = top.best.p;
+  let tier = TIERS.find(t => p >= t.min);
+  if (top.nowH.p >= 55 || nowBest >= 60) tier = { word: "Go now", glow: true, quip: "It’s happening right now. Get out, look north, and keep watching for at least an hour." };
+  $("verdict").textContent = tier.word;
+  $("verdict").classList.toggle("glow", tier.glow);
+  $("quip").textContent = tier.quip;
+
+  const b = top.best;
+  let why;
+  if (b.dark === 0 && b.p === 0) why = "It’s still too light. The night’s numbers fill in after sunset.";
+  else if (b.act < 0.25) why = "The sun’s having a quiet day. Clear skies won’t help if there’s nothing to see.";
+  else if (b.clear < 0.35) why = "Space weather is decent, but the clouds are winning" + (b.cc != null ? " (" + Math.round(b.cc) + "% cover at the best hour)." : ".");
+  else if (b.p >= 32) why = "Activity is up and the sky looks clear enough at " + top.s.name + ". That’s the combination you want.";
+  else why = "Some activity, some cloud. It could go either way, so watch the hourly chart.";
+  $("why").textContent = why;
+
+  $("fBest").innerHTML = "";
+  $("fBest").append(top.s.name + " ");
+  const sm = document.createElement("small"); sm.textContent = p + "%"; $("fBest").append(sm);
+  $("fTime").textContent = b.p > 0 ? tf.format(b.t) : "–";
+  const tonightKp = S.hours.map(kpAt).filter(v => v != null);
+  const kpMax = tonightKp.length ? Math.max(...tonightKp) : null;
+  $("fKp").innerHTML = kpMax == null ? "–" : kpMax.toFixed(1) + (gScale(kpMax) ? " <small>" + gScale(kpMax) + " storm</small>" : "");
+  $("fBz").innerHTML = S.bz == null ? "–" : (S.bz > 0 ? "+" : "") + S.bz + "<small>nT " + (S.bz < 0 ? "south" : "north") + "</small>";
+  const m = moon(Date.now());
+  $("fMoon").innerHTML = Math.round(m.illum * 100) + "%<small>" + m.name.toLowerCase() + "</small>";
+  sky.intensity = clamp(0.12 + p / 85, 0.12, 1);
+}
+function renderSpots() {
+  const ol = $("spots");
+  ol.textContent = "";
+  S.ranked.forEach((r, k) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "spot";
+    b.setAttribute("aria-pressed", String(r.s.id === S.sel));
+    b.addEventListener("click", () => { S.sel = r.s.id; S.picked = true; renderSpots(); renderTonight(); drawMap(); });
+    const pct = document.createElement("div");
+    pct.className = "pct"; pct.style.color = chanceColor(r.best.p);
+    pct.innerHTML = r.best.p + "<small>%</small>";
+    const mid = document.createElement("div");
+    const nm = document.createElement("div"); nm.className = "sname"; nm.textContent = r.s.name;
+    if (k === 0) { const t = document.createElement("span"); t.className = "tag pick"; t.textContent = "Your best bet"; nm.append(t); }
+    if (r.ferry) { const t = document.createElement("span"); t.className = "tag ferry"; t.textContent = "Ferry"; nm.append(t); }
+    const meta = document.createElement("div"); meta.className = "smeta";
+    meta.textContent = r.s.area + " · " + (r.ferry ? Math.round(r.dist) + " km + ferry" : driveText(r.mins) + " drive");
+    mid.append(nm, meta);
+    const when = document.createElement("div"); when.className = "when";
+    const bb = document.createElement("b");
+    bb.textContent = r.best.p > 0 ? "best " + tf.format(r.best.t) : "no window";
+    when.append(bb, r.best.cc == null ? "cloud ?" : "cloud " + Math.round(r.best.cc) + "%");
+    b.append(pct, mid, when);
+    li.append(b); ol.append(li);
+  });
+}
+function renderTonight() {
+  const r = S.ranked.find(x => x.s.id === S.sel);
+  if (!r) return;
+  $("selName").textContent = r.s.name;
+  $("selTitle").textContent = r.s.name;
+  $("selNote").textContent = r.s.note;
+  const kv = [
+    ["Area", r.s.area],
+    ["Kp needed", "≈ " + kpNeed(r.s.lat).toFixed(1)],
+    ["Best hour", r.best.p > 0 ? tf.format(r.best.t) + " · " + r.best.p + "%" : "none tonight"],
+    ["Cloud then", r.best.cc == null ? "unknown" : Math.round(r.best.cc) + "%"],
+    ["Right now", r.nowH.p + "%"],
+    ["From " + S.townObj.name, Math.round(r.dist) + " km" + (r.ferry ? " + ferry" : " · " + driveText(r.mins))]
+  ];
+  const dl = $("selKv"); dl.textContent = "";
+  for (const [k, v] of kv) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
+
+  const W = 680, H = 230, padL = 34, padB = 26, padT = 12, n = r.series.length;
+  const cw = (W - padL - 8) / n, y = (v) => padT + (H - padT - padB) * (1 - v / 100);
+  const now = Date.now();
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly chance for ${r.s.name}">`;
+  for (const g of [0, 25, 50, 75, 100]) svg += `<line x1="${padL}" x2="${W - 8}" y1="${y(g)}" y2="${y(g)}" stroke="rgba(233,238,246,${g ? 0.07 : 0.18})"/><text x="${padL - 6}" y="${y(g) + 4}" text-anchor="end">${g}</text>`;
+  let cloudPath = "";
+  r.series.forEach((h, k) => {
+    const x = padL + k * cw;
+    if (h.dark === 0) svg += `<rect x="${x}" y="${padT}" width="${cw}" height="${H - padT - padB}" fill="var(--loch)" opacity="0.55"/>`;
+    const past = h.t + HOUR <= now;
+    const bh = Math.max(h.p > 0 ? 2 : 0, (H - padT - padB) * h.p / 100);
+    svg += `<rect x="${x + cw * 0.18}" y="${y(0) - bh}" width="${cw * 0.64}" height="${bh}" rx="3" fill="${chanceColor(h.p)}" opacity="${past ? 0.35 : 1}"><title>${tf.format(h.t)}: ${h.p}% chance, cloud ${h.cc == null ? "?" : Math.round(h.cc) + "%"}</title></rect>`;
+    if (h.cc != null) cloudPath += (cloudPath ? "L" : "M") + (x + cw / 2).toFixed(1) + "," + y(h.cc).toFixed(1);
+    if (k % 2 === 0) svg += `<text x="${x + cw / 2}" y="${H - 8}" text-anchor="middle">${hf.format(h.t)}</text>`;
+    if (h.p > 0 && h.t === r.best.t) svg += `<text x="${x + cw / 2}" y="${y(h.p) - 6}" text-anchor="middle" style="fill:var(--frost)">${h.p}%</text>`;
+  });
+  if (cloudPath) svg += `<path d="${cloudPath}" fill="none" stroke="var(--mist)" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="4 4"/>`;
+  const nx = padL + (now - r.series[0].t) / HOUR * cw;
+  if (nx > padL && nx < W - 8) svg += `<line x1="${nx}" x2="${nx}" y1="${padT}" y2="${H - padB}" stroke="var(--whisky)" stroke-width="1.5"/><text x="${nx + 4}" y="${padT + 10}" style="fill:var(--whisky)">now</text>`;
+  svg += "</svg>";
+  $("hourChart").innerHTML = svg;
+}
+function renderWeather() {
+  const now = Date.now();
+  const cur = kpAt(now);
+  $("gKp").innerHTML = cur == null ? "–" : cur.toFixed(1) + (gScale(cur) ? "<small>" + gScale(cur) + "</small>" : "");
+  const need = kpNeed(S.townObj.lat);
+  $("gKpSay").textContent = cur == null ? "No Kp data right now." :
+    cur >= need ? "High enough for a show near " + S.townObj.name + "." :
+    cur >= need - 1.2 ? "Close. Northern and darker spots are in play." : "Quiet. Shetland and Orkney only, if anywhere.";
+  if (S.bz != null) {
+    $("gBz").innerHTML = (S.bz > 0 ? "+" : "") + S.bz + "<small>nT</small>";
+    $("gBzSay").textContent = S.bz <= -10 ? "Strongly south. The door is wide open." : S.bz <= -5 ? "Pointing south. Good news, it’s feeding the aurora." : S.bz < 0 ? "Slightly south. Helps a little." : S.bz < 5 ? "Pointing north. The door is mostly shut for now." : "Firmly north. Little gets in until it flips.";
+  } else { $("gBz").textContent = "–"; $("gBzSay").textContent = "No solar wind data right now."; }
+  if (S.wind != null) {
+    $("gWind").innerHTML = Math.round(S.wind) + "<small>km/s</small>";
+    $("gWindSay").textContent = S.wind >= 650 ? "Very fast. A storm-level stream is hitting." : S.wind >= 500 ? "Fast. Stronger push than usual." : S.wind >= 400 ? "Normal." : "Slow and calm.";
+  } else { $("gWind").textContent = "–"; $("gWindSay").textContent = "No solar wind data right now."; }
+
+  const box = $("kpChart");
+  if (!S.kp) { box.innerHTML = '<p class="muted">Kp forecast unavailable.</p>'; return; }
+  const rows = S.kp.filter(r => r.t >= now - 27 * HOUR);
+  const W = 760, H = 200, padL = 26, padB = 30, padT = 10, n = rows.length, cw = (W - padL - 6) / n;
+  const y = (v) => padT + (H - padT - padB) * (1 - v / 9);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kp index chart">`;
+  for (let g = 0; g <= 9; g += 3) svg += `<line x1="${padL}" x2="${W - 6}" y1="${y(g)}" y2="${y(g)}" stroke="rgba(233,238,246,${g ? 0.07 : 0.18})"/><text x="${padL - 6}" y="${y(g) + 4}" text-anchor="end">${g}</text>`;
+  rows.forEach((r, k) => {
+    const x = padL + k * cw, h = y(0) - y(r.kp);
+    const pred = r.kind === "predicted";
+    svg += `<rect x="${x + 1.5}" y="${y(r.kp)}" width="${cw - 3}" height="${Math.max(1, h)}" rx="2" fill="${kpColor(r.kp)}" opacity="${pred ? 0.6 : 1}"><title>${df.format(r.t)} ${tf.format(r.t)}: Kp ${r.kp.toFixed(2)} (${r.kind})</title></rect>`;
+    const lh = +hf.format(r.t);
+    if (lh < 3) svg += `<text x="${x}" y="${H - 9}">${df.format(r.t)}</text>`;
+    if (r.t <= now && now < r.t + 3 * HOUR) svg += `<line x1="${x + cw * (now - r.t) / (3 * HOUR)}" x2="${x + cw * (now - r.t) / (3 * HOUR)}" y1="${padT}" y2="${y(0)}" stroke="var(--whisky)" stroke-width="1.5"/>`;
+  });
+  svg += `<line x1="${padL}" x2="${W - 6}" y1="${y(need)}" y2="${y(need)}" stroke="var(--frost)" stroke-opacity="0.6" stroke-dasharray="5 4"/>`;
+  svg += "</svg>";
+  box.innerHTML = svg;
+  $("kpNeedKey").innerHTML = '<i style="background:none;border-top:2px dashed var(--frost);height:0;width:14px"></i>Needed near ' + S.townObj.name;
+}
+function renderStatus() {
+  const names = { kp: "Kp forecast", mag: "Solar wind field", wind: "Solar wind speed", ov: "Aurora oval", wx: "Cloud forecast" };
+  const el = $("src"); el.textContent = "";
+  for (const k of Object.keys(names)) {
+    const st = S.status[k];
+    const sp = document.createElement("span");
+    sp.className = st === "ok" ? "ok" : st ? "bad" : "";
+    sp.textContent = (st === "ok" ? "● " : st ? "○ " : "· ") + names[k];
+    el.append(sp);
+  }
+  const vs = Object.values(via);
+  if (vs.includes("connector")) el.append("Fetched through your Firecrawl connector.");
+  else if (vs.includes("snapshot")) el.append("Some feeds come from a copy refreshed every 15 minutes.");
+}
+function renderAll() {
+  compute(); renderHero(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
+}
+
+/* ---------- map ---------- */
+const land = LAND.split(";").map(r => { const v = r.split(",").map(Number), pts = []; let x = 0, y = 0; for (let i = 0; i < v.length; i += 2) { x += v[i]; y += v[i + 1]; pts.push([x / 1000, y / 1000]); } return pts; });
+const BOX = { w: -9.4, e: 1.6, s: 54.55, n: 61.0 };
+const KX = Math.cos(rad(57.7));
+function drawMap() {
+  const cv = $("map"), r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width, H = r.height;
+  const sx = W / ((BOX.e - BOX.w) * KX), sy = H / (BOX.n - BOX.s), s = Math.min(sx, sy);
+  const ox = (W - (BOX.e - BOX.w) * KX * s) / 2, oy = (H - (BOX.n - BOX.s) * s) / 2;
+  const P = (lon, lat) => [ox + (lon - BOX.w) * KX * s, oy + (BOX.n - lat) * s];
+  c.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement);
+  const col = (n) => css.getPropertyValue(n).trim();
+
+  // aurora oval glow from OVATION (or a Kp-based stand-in)
+  const gw = 16, gh = 10, off = document.createElement("canvas"); off.width = gw; off.height = gh;
+  const oc = off.getContext("2d"), img = oc.createImageData(gw, gh);
+  const kpNow = kpAt(Date.now());
+  for (let gx = 0; gx < gw; gx++) for (let gy = 0; gy < gh; gy++) {
+    const lon = BOX.w - 1 + gx * (BOX.e - BOX.w + 2) / (gw - 1), lat = BOX.n + 1 - gy * (BOX.n - BOX.s + 2) / (gh - 1);
+    let v = S.ov ? ovAt(lon, lat) : (kpNow == null ? 0 : 40 * sig((lat - (63.5 - 1.6 * kpNow)) * 1.2));
+    const a = clamp(v / 35);
+    const o = (gy * gw + gx) * 4;
+    img.data[o] = 95 + a * 85; img.data[o + 1] = 240 - a * 100; img.data[o + 2] = 176 + a * 79; img.data[o + 3] = Math.round(a * 200);
+  }
+  oc.putImageData(img, 0, 0);
+  const [ax, ay] = P(BOX.w - 1, BOX.n + 1), [bx, by] = P(BOX.e + 1, BOX.s - 1);
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+  c.drawImage(off, ax, ay, bx - ax, by - ay);
+
+  // land
+  c.beginPath();
+  for (const ring of land) ring.forEach(([lon, lat], i) => { const [x, y] = P(lon, lat); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.fillStyle = col("--peat"); c.globalAlpha = 0.92; c.fill("evenodd"); c.globalAlpha = 1;
+  c.strokeStyle = "rgba(233,238,246,0.22)"; c.lineWidth = 0.8; c.stroke();
+
+  // latitude ticks
+  c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
+  for (let lat = 55; lat <= 60; lat++) { const [, y] = P(BOX.w, lat); c.fillText(lat + "°N", 8, y + 3); }
+
+  // town marker
+  const t = S.townObj;
+  if (t) { const [x, y] = P(t.lon, t.lat); c.strokeStyle = col("--whisky"); c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 5, y); c.lineTo(x + 5, y); c.moveTo(x, y - 5); c.lineTo(x, y + 5); c.stroke(); c.fillStyle = col("--whisky"); c.fillText(t.name, x + 7, y + 3); }
+
+  // spots
+  for (const r of S.ranked) {
+    const [x, y] = P(r.s.lon, r.s.lat), sel = r.s.id === S.sel;
+    const p = r.best.p, rad0 = 4 + p / 14;
+    const cc = p >= 60 ? col("--heather") : p >= 35 ? col("--dancer") : p >= 15 ? col("--teal") : col("--dim");
+    c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
+    c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
+    if (sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
+  }
+  $("ovTime").textContent = S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : (S.ov ? "" : "Estimated from Kp");
+}
+
+/* ---------- hero sky ---------- */
+const sky = { intensity: 0.2, t: 0, stars: [] };
+(function initSky() {
+  const cv = $("sky"), c = cv.getContext("2d");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, last = 0;
+  function size() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    sky.stars = Array.from({ length: Math.round(W * H / 2600) }, () => ({ x: Math.random() * W, y: Math.random() * H * 0.8, r: Math.random() * 1.1 + 0.2, a: Math.random() * 0.6 + 0.2, f: Math.random() * 6 }));
+  }
+  function ridge(x) { return H * 0.86 - 26 * Math.sin(x / 140 + 1.3) - 16 * Math.sin(x / 57) - 34 * Math.sin(x / 390 + 0.4) - 10 * Math.sin(x / 23 + 2); }
+  function frame(ts) {
+    if (!reduce) requestAnimationFrame(frame);
+    if (ts - last < 33 && !reduce) return; last = ts;
+    const t = (sky.t += reduce ? 0 : 0.012), I = sky.intensity;
+    c.clearRect(0, 0, W, H);
+    const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#050811"); bg.addColorStop(1, "#0b1424");
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    for (const s of sky.stars) { c.globalAlpha = s.a * (0.7 + 0.3 * Math.sin(t * 3 + s.f)); c.fillStyle = "#e9eef6"; c.fillRect(s.x, s.y, s.r, s.r); }
+    c.globalAlpha = 1; c.globalCompositeOperation = "lighter";
+    const N = Math.max(40, Math.round(W / 14)), base = H * 0.7;
+    for (let k = 0; k < 2; k++) for (let i = 0; i < N; i++) {
+      const x = i / N * W + 30 * Math.sin(t * 0.8 + i * 0.21 + k * 2);
+      const n = 0.5 + 0.5 * Math.sin(i * 0.17 + t * 1.3 + k) * Math.sin(i * 0.05 - t * 0.6 + k * 3);
+      const h = H * (0.18 + 0.5 * n) * (0.35 + 0.65 * I);
+      const yb = base - 40 * Math.sin(i / N * Math.PI * 2 + t * 0.4 + k) - k * 30;
+      const g = c.createLinearGradient(0, yb, 0, yb - h);
+      const a = (0.05 + 0.13 * n) * I * (k ? 0.6 : 1);
+      g.addColorStop(0, `rgba(95,240,176,${a})`); g.addColorStop(0.45, `rgba(60,198,201,${a * 0.6})`); g.addColorStop(0.8, `rgba(180,140,255,${a * 0.45})`); g.addColorStop(1, "rgba(180,140,255,0)");
+      c.fillStyle = g; c.fillRect(x, yb - h, W / N * 1.6, h + 8);
+    }
+    c.globalCompositeOperation = "source-over";
+    c.beginPath(); c.moveTo(0, H); for (let x = 0; x <= W; x += 8) c.lineTo(x, ridge(x)); c.lineTo(W, H); c.closePath();
+    c.fillStyle = "#04070d"; c.fill();
+  }
+  size(); requestAnimationFrame(frame);
+  new ResizeObserver(() => { size(); if (reduce) requestAnimationFrame(frame); }).observe(cv);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && reduce) requestAnimationFrame(frame); });
+})();
+
+/* ---------- loading ---------- */
+let loading = false;
+function setLive(text, kind) { $("liveText").textContent = text; $("dot").className = "dot" + (kind ? " " + kind : ""); }
+function showNotice(msg, btn) { $("notice").hidden = !msg; $("noticeText").textContent = msg || ""; $("noticeBtn").hidden = !btn; }
+const CODE_COPY = {
+  server_not_connected: "Live data reaches this page through the Firecrawl connector. Add Firecrawl in claude.ai Settings → Connectors, then refresh.",
+  selection_required: "You have more than one Firecrawl connector. Pick one when claude.ai asks, then refresh.",
+  needs_reauth: "Your Firecrawl connector needs reconnecting. Go to claude.ai Settings → Connectors, then refresh.",
+  not_in_manifest: "This page needs your OK to fetch live data through Firecrawl.",
+  approval_required: "This page needs your OK to fetch live data through Firecrawl.",
+  consent_required: "This page needs your OK to fetch live data through Firecrawl.",
+  blocked_by_policy: "Your organisation blocks the Firecrawl connector here, so live data can’t load.",
+  no_route: "This copy of the page can’t reach the live data feeds."
+};
+async function load() {
+  if (loading) return; loading = true;
+  $("refresh").disabled = true; setLive("Updating…", "on");
+  const jobs = {
+    kp: async () => { S.kp = parseKp(await getJSON("kp")); },
+    mag: async () => { const j = await getJSON("mag"); const r = Array.isArray(j) ? j[0] : j; S.bz = Math.round(parseFloat(r.bz_gsm ?? r.Bz) * 10) / 10; S.bt = parseFloat(r.bt ?? r.Bt); if (!isFinite(S.bz)) S.bz = null; },
+    wind: async () => { const j = await getJSON("wind"); const r = Array.isArray(j) ? j[0] : j; S.wind = parseFloat(r.proton_speed ?? r.WindSpeed); if (!isFinite(S.wind)) S.wind = null; },
+    wx: async () => { const j = await getJSON("wx"); const arr = Array.isArray(j) ? j : [j]; S.wx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
+    ov: async () => { const j = await getJSON("ov"); S.ov = parseOv(j); S.ovAt = Date.parse(j["Forecast Time"] || j["Observation Time"]) || null; }
+  };
+  const errs = {};
+  const run = async (k) => { try { await jobs[k](); S.status[k] = "ok"; } catch (e) { S.status[k] = "fail"; errs[k] = e; } };
+  await run("kp"); // first call alone, so any connector consent prompt appears once
+  await Promise.all(["mag", "wind", "wx", "ov"].map(run));
+  loading = false; $("refresh").disabled = false;
+  const failed = Object.keys(errs);
+  const codes = failed.map(k => errs[k] && errs[k].code).filter(Boolean);
+  const code = codes.find(c => CODE_COPY[c]) || null;
+  if (failed.length === 5) {
+    setLive("Offline", "err");
+    showNotice(CODE_COPY[code] || "The live feeds didn’t answer. Try again in a minute.", true);
+    $("noticeBtn").textContent = ["not_in_manifest", "approval_required", "consent_required"].includes(code) ? "Allow live data" : "Try again";
+  } else {
+    showNotice(failed.length ? (failed.includes("wx") ? "The cloud forecast didn’t load, so chances assume patchy cloud." : failed.includes("kp") ? "The Kp forecast didn’t load, so later hours are uncertain." : "") : "", false);
+    S.updated = Date.now();
+    setLive("Live · " + tf.format(S.updated), "on");
+  }
+  renderAll();
+  schedule();
+}
+let timer = null;
+function schedule() { clearTimeout(timer); timer = setTimeout(load, (usesConnector() ? 15 : 5) * 60000); }
+$("refresh").addEventListener("click", load);
+$("noticeBtn").addEventListener("click", load);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > 10 * 60000) load(); });
+
+/* ---------- where am I ---------- */
+const sel = $("town");
+for (const t of TOWNS) { const o = document.createElement("option"); o.value = t.name; o.textContent = t.name; sel.append(o); }
+if (!TOWNS.some(t => t.name === S.town)) S.town = "Glasgow";
+sel.value = S.town;
+sel.addEventListener("change", () => { S.town = sel.value; S.here = null; S.picked = false; store.set("town", S.town); renderAll(); });
+$("locate").addEventListener("click", () => {
+  if (!navigator.geolocation) { $("locate").textContent = "Location unavailable"; $("locate").disabled = true; return; }
+  $("locate").textContent = "Finding you…";
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    const nearest = TOWNS.reduce((a, b) => (km(here, b) < km(here, a) ? b : a));
+    S.here = { name: "you", lat: here.lat, lon: here.lon, group: km(here, nearest) < 40 ? nearest.group : undefined };
+    S.picked = false; $("locate").textContent = "Using your location";
+    renderAll();
+  }, () => { $("locate").textContent = "Location blocked, pick a town"; $("locate").disabled = true; }, { timeout: 10000, maximumAge: 600000 });
+});
+
+/* ---------- alerts ---------- */
+const ALERT_AT = 35;
+let alertOn = store.get("alert", false), lastAlerted = 0, audio = null;
+function paintToggle() { $("alertToggle").setAttribute("aria-checked", String(alertOn)); }
+function chime() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 659.25, 783.99].forEach((f, i) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0, audio.currentTime + i * 0.18); g.gain.linearRampToValueAtTime(0.18, audio.currentTime + i * 0.18 + 0.03); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + i * 0.18 + 1.2); o.connect(g).connect(audio.destination); o.start(audio.currentTime + i * 0.18); o.stop(audio.currentTime + i * 0.18 + 1.3); });
+  } catch (e) { /* no audio here */ }
+}
+$("alertToggle").addEventListener("click", async () => {
+  alertOn = !alertOn; store.set("alert", alertOn); paintToggle();
+  if (alertOn) {
+    chime();
+    let perm = "unsupported";
+    try { if ("Notification" in window) perm = await Notification.requestPermission(); } catch (e) { perm = "denied"; }
+    $("alertStatus").textContent = perm === "granted" ? "On. You’ll get a notification and a chime while this page is open." : "On. Notifications are blocked here, so you’ll get a chime and the tab title will change. Keep the page open.";
+    lastAlerted = 0; checkAlert();
+  } else { $("alertStatus").textContent = "Off."; document.title = "Mirrie Dancers"; }
+});
+function checkAlert() {
+  if (!alertOn || !S.ranked.length) return;
+  const top = S.ranked[0], p = Math.max(top.nowH.p, top.best.p);
+  if (p >= ALERT_AT && Date.now() - lastAlerted > 2 * HOUR) {
+    lastAlerted = Date.now();
+    const msg = top.s.name + ": " + p + "% chance, best around " + tf.format(top.best.t) + ".";
+    document.title = "● Aurora chance " + p + "% · Mirrie Dancers";
+    chime();
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Northern lights chance is up", { body: msg }); } catch (e) { /* not allowed in this view */ }
+    $("alertStatus").textContent = "Alert sent " + tf.format(Date.now()) + ": " + msg;
+  } else if (p < ALERT_AT) { document.title = "Mirrie Dancers"; }
+}
+paintToggle();
+if (alertOn) $("alertStatus").textContent = "On. Checking every few minutes while this page is open.";
+
+/* ---------- share (public site only) ---------- */
+if (!window.claude) {
+  const sb = $("share"); sb.hidden = false;
+  sb.addEventListener("click", async () => {
+    const url = location.href.split("#")[0];
+    try {
+      if (navigator.share) { await navigator.share({ title: "Mirrie Dancers", text: "Will we see the northern lights in Scotland tonight?", url }); return; }
+      await navigator.clipboard.writeText(url); sb.textContent = "Link copied";
+    } catch (e) { if (e && e.name !== "AbortError") sb.textContent = url; }
+    setTimeout(() => { sb.textContent = "Share"; }, 4000);
+  });
+}
+
+new ResizeObserver(() => drawMap()).observe($("map"));
+compute(); renderSpots(); renderTonight(); renderStatus(); drawMap();
+load();
+})();
+</script>
+
+</body>
+</html>
