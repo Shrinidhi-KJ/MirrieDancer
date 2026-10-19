@@ -146,6 +146,16 @@ select {
   background-position: calc(100% - 17px) 55%, calc(100% - 12px) 55%;
   background-size: 5px 5px; background-repeat: no-repeat;
 }
+.minehead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 28px; flex-wrap: wrap; margin-bottom: 22px; }
+.minehead > div { min-width: 0; }
+.pct.minepct { font-size: clamp(64px, 11vw, 112px); line-height: 0.85; text-align: right; }
+.pct.minepct small { font-size: 0.3em; }
+.minefacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 24px; margin: 0 0 18px; padding: 16px 0; border-block: 1px solid var(--rule); }
+.minefacts div { display: grid; gap: 4px; min-width: 0; }
+.minefacts dt { font: 500 11.5px/1.2 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mist); }
+.minefacts dd { margin: 0; font: 800 24px/1.1 var(--display); letter-spacing: 0.01em; }
+.minefacts dd small { font: 400 12px/1.3 var(--mono); color: var(--mist); display: block; margin-top: 3px; letter-spacing: 0; }
+.abroad { margin: 0 0 22px; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(180, 140, 255, 0.35); background: rgba(180, 140, 255, 0.08); max-width: 760px; }
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg button { background: transparent; border: 0; border-radius: 999px; padding: 5px 12px; font: 500 13px/1 var(--body); color: var(--mist); cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--peat); color: var(--frost); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); }
@@ -300,8 +310,24 @@ footer p { margin: 0; max-width: 90ch; }
     </div>
   </section>
 
+  <section class="block" id="mine" aria-labelledby="mineH" hidden>
+    <div class="wrap">
+      <div class="minehead">
+        <div>
+          <div class="eyebrow">Your sky tonight · <span id="mineWhere"></span></div>
+          <h2 id="mineH">Right where you’re standing</h2>
+          <p class="lede" id="mineLede"></p>
+        </div>
+        <div class="pct minepct" id="minePct">–</div>
+      </div>
+      <dl class="minefacts" id="mineFacts"></dl>
+      <div class="chart" id="mineChart"></div>
+    </div>
+  </section>
+
   <section class="block" id="where" aria-labelledby="whereH">
     <div class="wrap">
+      <p class="abroad" id="abroadNote" hidden></p>
       <div class="head">
         <div>
           <div class="eyebrow">Where to stand</div>
@@ -515,6 +541,13 @@ function moon(t) {
 }
 /* Kp needed for a show on the northern horizon, by latitude (rough, Scotland-tuned) */
 const kpNeed = (lat) => clamp(3 + (60.2 - lat) * 0.62, 2.5, 7.5);
+/* anywhere in the world: geomagnetic latitude from a tilted dipole (pole near 80.8°N 72.6°W), calibrated so
+   central Scotland matches the rule above. The southern boost roughly allows for the dipole's offset. Rough by design. */
+function magLat(lat, lon) {
+  const pl = rad(80.8), pn = rad(-72.6), f = rad(lat), l = rad(lon);
+  return Math.asin(Math.sin(f) * Math.sin(pl) + Math.cos(f) * Math.cos(pl) * Math.cos(l - pn)) * 180 / Math.PI;
+}
+const kpNeedAt = (lat, lon) => clamp((69.8 - Math.abs(magLat(lat, lon)) - (lat < 0 ? 4 : 0)) / 2.04, 1, 9);
 function gScale(kp) { return kp >= 9 ? "G5" : kp >= 8 ? "G4" : kp >= 7 ? "G3" : kp >= 6 ? "G2" : kp >= 5 ? "G1" : null; }
 function kpColor(kp) { return kp >= 7 ? "var(--rose)" : kp >= 6 ? "var(--heather)" : kp >= 5 ? "var(--dancer)" : kp >= 4 ? "var(--teal)" : "var(--low)"; }
 /* write a chance as "54%"; above 50% each digit gets its own staggered aurora animation */
@@ -539,9 +572,10 @@ const URLS = {
 };
 const mcpReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("mcp").catch(() => null) : Promise.resolve(null);
 const via = {}; // per source: "live" | "snapshot" | "connector"
-async function getJSON(key) {
+async function getJSON(key, url) {
+  url = url || URLS[key];
   try {
-    const r = await fetch(URLS[key], { cache: "no-store" });
+    const r = await fetch(url, { cache: "no-store" });
     if (r.ok) { const j = await r.json(); via[key] = "live"; return j; }
   } catch (e) { /* blocked or offline: try the snapshot */ }
   try {
@@ -551,7 +585,7 @@ async function getJSON(key) {
   const mcp = await mcpReady;
   if (!mcp) throw Object.assign(new Error("No route to live data"), { code: "no_route" });
   const res = await mcp.callTool("Firecrawl", "firecrawl_scrape",
-    { url: URLS[key], formats: ["rawHtml"], maxAge: 0, objective: "Read live aurora and cloud data for a Scotland northern lights forecast page" },
+    { url, formats: ["rawHtml"], maxAge: 0, objective: "Read live aurora and cloud data for a Scotland northern lights forecast page" },
     { cache: { staleTime: 240000, gcTime: 3600000 } });
   const p = res && res.payload;
   const raw = typeof p === "string" ? p : p && (p.rawHtml ?? (p.data && p.data.rawHtml));
@@ -593,7 +627,8 @@ function ovAt(lon, lat) {
 function ovView(s) {
   if (!S.ov) return null;
   let best = 0;
-  for (let dl = 0; dl <= 10; dl++) for (let dx = -1; dx <= 1; dx++) best = Math.max(best, ovAt(s.lon + dx, s.lat + dl) * (1 - dl / 13));
+  const pole = s.lat < 0 ? -1 : 1; // look towards the nearer pole
+  for (let dl = 0; dl <= 10; dl++) for (let dx = -1; dx <= 1; dx++) best = Math.max(best, ovAt(s.lon + dx, s.lat + pole * dl) * (1 - dl / 13));
   return best;
 }
 function kpAt(t) {
@@ -601,8 +636,8 @@ function kpAt(t) {
   for (let i = S.kp.length - 1; i >= 0; i--) if (S.kp[i].t <= t) return t - S.kp[i].t < 3 * HOUR ? S.kp[i].kp : null;
   return null;
 }
-function cloudAt(i, t) {
-  const w = S.wx && S.wx[i];
+function cloudAt(i, t) { return cloudFrom(S.wx && S.wx[i], t); }
+function cloudFrom(w, t) {
   if (!w) return null;
   const k = Math.round((t - w.t0) / HOUR);
   const v = w.cc[k];
@@ -612,19 +647,22 @@ function cloudAt(i, t) {
 /* ---------- the model ---------- */
 function score(s, i, t, now) {
   const kp = kpAt(t);
-  let act = kp == null ? 0 : sig(1.5 * (kp - kpNeed(s.lat)));
+  let act = kp == null ? 0 : sig(1.5 * (kp - (s.need != null ? s.need : kpNeed(s.lat))));
   const ahead = (t - now) / HOUR;
   const ov = ovView(s);
   if (ov != null && ahead > -1 && ahead < 1.5) act = 0.45 * act + 0.55 * clamp(ov / 22);
   if (S.bz != null && ahead > -1 && ahead < 2) act = clamp(act + (S.bz <= -10 ? 0.22 : S.bz <= -5 ? 0.12 : S.bz <= -2 ? 0.05 : S.bz >= 5 ? -0.08 : 0));
   const alt = sunAlt(t, s.lat, s.lon);
   const dark = alt <= -12 ? 1 : alt >= -6 ? 0 : (-6 - alt) / 6;
-  const cc = cloudAt(i, t);
+  const cc = s.wx !== undefined ? cloudFrom(s.wx, t) : cloudAt(i, t);
   const clear = cc == null ? 0.6 : Math.pow(1 - cc / 100, 1.3);
   return { t, p: Math.round(100 * act * dark * clear * s.sky), act, dark, clear, cc, kp };
 }
-function nightHours(now) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now).map(p => [p.type, p.value]));
+const LOCAL_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"; } catch (e) { return "Europe/London"; } })();
+const ltf = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: LOCAL_TZ });
+const lhf = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", timeZone: LOCAL_TZ });
+function nightHours(now, tz) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: tz || "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now).map(p => [p.type, p.value]));
   const localHour = +parts.hour;
   const offset = Date.UTC(+parts.year, +parts.month - 1, +parts.day, localHour) - Math.floor(now / HOUR) * HOUR;
   const dayStartUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offset;
@@ -635,8 +673,23 @@ function compute() {
   const now = Date.now();
   const hours = nightHours(now);
   const cur = Math.floor(now / HOUR) * HOUR;
-  const town = S.here || TOWNS.find(t => t.name === S.town) || TOWNS[8];
+  S.nearestSpotKm = S.here ? Math.min(...SPOTS.map(sp => km(S.here, sp))) : 0;
+  S.abroad = !!S.here && S.nearestSpotKm > 150; // outside Scotland: rank the list from Glasgow for trip planning
+  const glasgow = TOWNS.find(t => t.name === "Glasgow");
+  const town = S.abroad ? glasgow : S.here || TOWNS.find(t => t.name === S.town) || glasgow;
   S.hours = hours;
+  S.mine = null;
+  if (S.here) {
+    const key = S.here.lat.toFixed(2) + "," + S.here.lon.toFixed(2);
+    const me = { id: "mine", name: "Your sky", area: "where you are", lat: S.here.lat, lon: S.here.lon, sky: 0.8,
+      need: kpNeedAt(S.here.lat, S.here.lon), wx: S.mineWx && S.mineWx.key === key ? S.mineWx : null };
+    const series = nightHours(now, LOCAL_TZ).map(t => score(me, -1, t, now));
+    const future = series.filter(h => h.t >= cur);
+    const best = future.reduce((a, b) => (b.p > a.p ? b : a), future[0] || series[series.length - 1]);
+    const dark = series.filter(h => h.dark > 0);
+    S.mine = { s: me, series, best, nowH: series.find(h => h.t === cur) || score(me, -1, cur, now),
+      darkFrom: dark.length ? dark[0].t : null, darkTo: dark.length ? dark[dark.length - 1].t + HOUR : null, south: S.here.lat < 0 };
+  }
   S.ranked = SPOTS.map((s, i) => {
     const series = hours.map(t => score(s, i, t, now));
     const future = series.filter(h => h.t >= cur);
@@ -659,10 +712,11 @@ const TIERS = [
   { min: 14, word: "Long shot", glow: false, quip: "Your phone camera might catch a glow low on the northern horizon. Your eyes probably won’t." },
   { min: -1, word: "Stay in. Kettle on.", glow: false, quip: "Nothing worth the drive tonight. Turn on the alert below and we’ll shout if that changes." }
 ];
+const primary = () => (S.abroad && S.mine ? S.mine : S.ranked[0]);
 function renderHero() {
-  const top = S.ranked[0];
-  const town = S.townObj;
-  $("heroEyebrow").textContent = S.here ? "Tonight near you" + (S.here.near ? " · " + S.here.near : "") : "Tonight near " + town.name;
+  const top = primary(), mineMode = top === S.mine;
+  const town = S.townObj, fmt = mineMode ? ltf : tf;
+  $("heroEyebrow").textContent = mineMode ? "Tonight where you are" : S.here ? "Tonight near you" + (S.here.near ? " · " + S.here.near : "") : "Tonight near " + town.name;
   const any = S.kp || S.wx;
   if (!any) {
     $("verdict").textContent = "Sky unreadable";
@@ -671,13 +725,13 @@ function renderHero() {
     $("why").textContent = "";
     return;
   }
-  const nowBest = Math.max(...S.ranked.map(r => r.nowH.p));
+  const nowBest = mineMode ? top.nowH.p : Math.max(...S.ranked.map(r => r.nowH.p));
   const p = top.best.p;
   let tier = TIERS.find(t => p >= t.min);
   if (top.nowH.p >= 55 || nowBest >= 60) tier = { word: "Go now", glow: true, quip: "It’s happening right now. Get out, look north, and keep watching for at least an hour." };
   $("verdict").textContent = tier.word;
   $("verdict").classList.toggle("glow", tier.glow);
-  $("quip").textContent = tier.quip;
+  $("quip").textContent = mineMode && S.mine.south ? tier.quip.replace(/north/g, "south") : tier.quip;
 
   const b = top.best;
   let why;
@@ -685,11 +739,11 @@ function renderHero() {
   else if (b.act < 0.25) {
     const kpTonight = Math.max(0, ...S.hours.map(kpAt).filter(v => v != null));
     why = kpTonight >= 4
-      ? "There’s a minor storm tonight (Kp " + kpTonight.toFixed(1) + "), but it’s not quite strong enough to reach this far south."
+      ? "There’s a minor storm tonight (Kp " + kpTonight.toFixed(1) + "), but it’s not quite strong enough to reach this far " + (mineMode && S.mine.south ? "north." : "south.")
       : "The sun’s having a quiet day. Clear skies won’t help if there’s nothing to see.";
   }
   else if (b.clear < 0.35) why = "Space weather is decent, but the clouds are winning" + (b.cc != null ? " (" + Math.round(b.cc) + "% cover at the best hour)." : ".");
-  else if (b.p >= 32) why = "Activity is up and the sky looks clear enough at " + top.s.name + ". That’s the combination you want.";
+  else if (b.p >= 32) why = "Activity is up and the sky looks clear enough " + (mineMode ? "where you are" : "at " + top.s.name) + ". That’s the combination you want.";
   else why = "Some activity, some cloud. It could go either way, so watch the hourly chart.";
   const far = S.ranked.reduce((x, y) => (y.best.p > x.best.p ? y : x));
   if (far !== top && far.best.p >= 35 && far.best.p > p + 15) why += " Best in Scotland tonight: " + far.s.name + " (" + far.s.area + ") at " + far.best.p + "%.";
@@ -698,7 +752,7 @@ function renderHero() {
   $("fBest").innerHTML = "";
   $("fBest").append(top.s.name + " ");
   const sm = document.createElement("small"); writeChance(sm, p, false); $("fBest").append(sm);
-  $("fTime").textContent = b.p > 0 ? tf.format(b.t) : "–";
+  $("fTime").textContent = b.p > 0 ? fmt.format(b.t) : "–";
   const tonightKp = S.hours.map(kpAt).filter(v => v != null);
   const kpMax = tonightKp.length ? Math.max(...tonightKp) : null;
   $("fKp").innerHTML = kpMax == null ? "–" : kpMax.toFixed(1) + (gScale(kpMax) ? " <small>" + gScale(kpMax) + " storm</small>" : "");
@@ -754,6 +808,9 @@ function renderTonight() {
   const dl = $("selKv"); dl.textContent = "";
   for (const [k, v] of kv) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
 
+  $("hourChart").innerHTML = hourChart(r, tf, hf);
+}
+function hourChart(r, tf, hf) {
   const W = 680, H = 230, padL = 34, padB = 26, padT = 12, n = r.series.length;
   const cw = (W - padL - 8) / n, y = (v) => padT + (H - padT - padB) * (1 - v / 100);
   const now = Date.now();
@@ -774,7 +831,42 @@ function renderTonight() {
   const nx = padL + (now - r.series[0].t) / HOUR * cw;
   if (nx > padL && nx < W - 8) svg += `<line x1="${nx}" x2="${nx}" y1="${padT}" y2="${H - padB}" stroke="var(--whisky)" stroke-width="1.5"/><text x="${nx + 4}" y="${padT + 10}" style="fill:var(--whisky)">now</text>`;
   svg += "</svg>";
-  $("hourChart").innerHTML = svg;
+  return svg;
+}
+function renderMine() {
+  const block = $("mine"), m = S.mine;
+  block.hidden = !m;
+  const note = $("abroadNote");
+  note.hidden = !S.abroad;
+  if (S.abroad) note.textContent = "You’re about " + Math.round(S.nearestSpotKm / 10) * 10 + " km from the nearest spot on this site. The list below is for Scotland, ranked from Glasgow if you’re planning a trip. Your own sky is above.";
+  if (!m) return;
+  const lat = S.here.lat, lon = S.here.lon;
+  const coords = Math.abs(lat).toFixed(1) + "°" + (lat >= 0 ? "N" : "S") + ", " + Math.abs(lon).toFixed(1) + "°" + (lon >= 0 ? "E" : "W");
+  $("mineWhere").textContent = S.here.near ? "near " + S.here.near : coords;
+  const tzNote = LOCAL_TZ !== "Europe/London" ? " Times are in your time zone." : "";
+  $("mineLede").textContent = (m.south
+    ? "You’re in the southern hemisphere, so you’re looking for the aurora australis, low over the southern horizon."
+    : "The aurora shows up low over your northern horizon first.") +
+    " This assumes a little light pollution: getting away from street lights helps." + tzNote;
+  writeChance($("minePct"), m.best.p, true);
+  $("minePct").style.color = chanceColor(m.best.p);
+  const kpT = S.hours.map(kpAt).filter(v => v != null), kpMax = kpT.length ? Math.max(...kpT) : null;
+  const facts = [
+    ["Best time", m.best.p > 0 ? ltf.format(m.best.t) : "None tonight", m.best.p > 0 ? m.best.p + "% chance" : ""],
+    ["Cloud then", m.best.cc == null ? "Loading…" : Math.round(m.best.cc) + "%", m.best.cc == null ? "" : m.best.cc < 30 ? "mostly clear" : m.best.cc < 70 ? "patchy" : "heavy"],
+    ["Right now", m.nowH.p + "%", m.nowH.dark === 0 ? "too light" : ""],
+    ["Dark enough", m.darkFrom ? ltf.format(m.darkFrom) + "–" + ltf.format(m.darkTo) : "Not tonight", m.darkFrom ? "" : "too light at this latitude"],
+    ["Kp needed here", "≈ " + m.s.need.toFixed(1), kpMax != null ? "tonight’s peak " + kpMax.toFixed(1) : ""],
+    ["Look", m.south ? "South" : "North", "low on the horizon"]
+  ];
+  const dl = $("mineFacts"); dl.textContent = "";
+  for (const [k, v, sub] of facts) {
+    const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
+    dt.textContent = k; dd.textContent = v;
+    if (sub) { const sm = document.createElement("small"); sm.textContent = sub; dd.append(sm); }
+    d.append(dt, dd); dl.append(d);
+  }
+  $("mineChart").innerHTML = hourChart(m, ltf, lhf);
 }
 function renderWeather() {
   const now = Date.now();
@@ -815,6 +907,7 @@ function renderWeather() {
 }
 function renderStatus() {
   const names = { kp: "Kp forecast", mag: "Solar wind field", wind: "Solar wind speed", ov: "Aurora oval", wx: "Cloud forecast" };
+  if (S.here) names.here = "Your cloud forecast";
   const el = $("src"); el.textContent = "";
   for (const k of Object.keys(names)) {
     const st = S.status[k];
@@ -828,7 +921,7 @@ function renderStatus() {
   else if (vs.includes("snapshot")) el.append("Some feeds come from a copy refreshed every 15 minutes.");
 }
 function renderAll() {
-  compute(); renderHero(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
+  compute(); renderHero(); renderMine(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
   if (pinned) showTip(pinned, "pin"); else if (hoverId) showTip(hoverId, "hover");
 }
 
@@ -1009,7 +1102,19 @@ async function load() {
     setLive("Live · " + tf.format(S.updated), "on");
   }
   renderAll();
+  loadMine();
   schedule();
+}
+async function loadMine() {
+  if (!S.here) return;
+  const key = S.here.lat.toFixed(2) + "," + S.here.lon.toFixed(2);
+  if (S.mineWx && S.mineWx.key === key && Date.now() - S.mineWx.at < 20 * 60000) return;
+  try {
+    const j = await getJSON("here", "https://api.open-meteo.com/v1/forecast?latitude=" + S.here.lat.toFixed(2) + "&longitude=" + S.here.lon.toFixed(2) + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT");
+    S.mineWx = { key, at: Date.now(), t0: Date.parse(j.hourly.time[0] + "Z"), cc: j.hourly.cloud_cover };
+    S.status.here = "ok";
+  } catch (e) { S.status.here = "fail"; }
+  renderAll();
 }
 let timer = null;
 function schedule() { clearTimeout(timer); timer = setTimeout(load, (usesConnector() ? 15 : 5) * 60000); }
@@ -1039,7 +1144,7 @@ function locate(auto) {
     setHere(lat, lon);
     store.set("here", { lat, lon }); store.set("town", "__here");
     S.picked = false; btn.textContent = "Using your location";
-    renderAll();
+    renderAll(); loadMine();
   }, () => {
     btn.textContent = auto ? "Use my location" : "Location blocked, pick a town";
     if (S.here) return; // keep the last known spot
@@ -1092,10 +1197,10 @@ $("alertToggle").addEventListener("click", async () => {
 });
 function checkAlert() {
   if (!alertOn || !S.ranked.length) return;
-  const top = S.ranked[0], p = Math.max(top.nowH.p, top.best.p);
+  const top = primary(), p = Math.max(top.nowH.p, top.best.p);
   if (p >= ALERT_AT && Date.now() - lastAlerted > 2 * HOUR) {
     lastAlerted = Date.now();
-    const msg = top.s.name + ": " + p + "% chance, best around " + tf.format(top.best.t) + ".";
+    const msg = top.s.name + ": " + p + "% chance, best around " + (top === S.mine ? ltf : tf).format(top.best.t) + ".";
     document.title = "● Aurora chance " + p + "% · Mirrie Dancers";
     chime();
     try { if ("Notification" in window && Notification.permission === "granted") new Notification("Northern lights chance is up", { body: msg }); } catch (e) { /* not allowed in this view */ }
