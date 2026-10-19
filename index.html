@@ -183,6 +183,7 @@ select {
 .mapbox canvas { display: block; width: 100%; aspect-ratio: 0.92; max-width: 100%; }
 .legend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 400 11px/1.3 var(--mono); color: var(--mist); pointer-events: none; }
 .mapbox canvas { touch-action: manipulation; }
+.mapbox canvas.flow { position: absolute; left: 0; top: 0; width: auto; aspect-ratio: auto; pointer-events: none; }
 .tip {
   position: absolute; z-index: 2; left: 0; top: 0; width: min(290px, calc(100% - 20px));
   background: rgba(11, 18, 34, 0.95); border: 1px solid rgba(95, 240, 176, 0.28); border-radius: 14px;
@@ -965,7 +966,7 @@ function drawMap() {
     let v = S.ov ? ovAt(lon, lat) : (kpNow == null ? 0 : 40 * sig((lat - (63.5 - 1.6 * kpNow)) * 1.2));
     const a = clamp(v / 35);
     const o = (gy * gw + gx) * 4;
-    img.data[o] = 95 + a * 85; img.data[o + 1] = 240 - a * 100; img.data[o + 2] = 176 + a * 79; img.data[o + 3] = Math.round(a * 200);
+    img.data[o] = 95 + a * 85; img.data[o + 1] = 240 - a * 100; img.data[o + 2] = 176 + a * 79; img.data[o + 3] = Math.round(a * 150);
   }
   oc.putImageData(img, 0, 0);
   const [ax, ay] = P(BOX.w - 1, BOX.n + 1), [bx, by] = P(BOX.e + 1, BOX.s - 1);
@@ -1014,6 +1015,7 @@ function drawMap() {
     if (sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
   $("ovTime").textContent = S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : (S.ov ? "" : "Estimated from Kp");
+  setFlow(flowMain, P, W, H, s, false, { w: BOX.w - 1, e: BOX.e + 1, s: BOX.s - 1, n: BOX.n + 3 });
 }
 
 /* ---------- the visitor's own map: their coastline, their position and the live aurora oval ---------- */
@@ -1067,7 +1069,7 @@ function drawMineMap() {
     else { if (kpNow == null) continue; const m = Math.abs(magLat(la, lo)); v = 40 * sig((m - (66.5 - 2.04 * kpNow)) * 1.2) * sig((75 + 0.5 * kpNow - m) * 0.8); }
     if (v < 3) continue;
     const a = clamp(v / 35);
-    oc.fillStyle = "rgba(" + Math.round(95 + a * 85) + "," + Math.round(240 - a * 100) + "," + Math.round(176 + a * 79) + "," + (0.15 + 0.5 * a).toFixed(2) + ")";
+    oc.fillStyle = "rgba(" + Math.round(95 + a * 85) + "," + Math.round(240 - a * 100) + "," + Math.round(176 + a * 79) + "," + (0.06 + 0.26 * a).toFixed(2) + ")";
     oc.fillRect(x / q - cell / 2, y / q - cell / 2, cell, cell);
   }
   c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
@@ -1082,7 +1084,99 @@ function drawMineMap() {
   const lab = "You" + (S.here.source === "ip" ? " (approx.)" : "");
   c.fillText(lab, ux + 12 + c.measureText(lab).width > W - 8 ? ux - 12 - c.measureText(lab).width : ux + 12, uy + 4);
   $("mineMapNote").textContent = S.ov && S.ovFull ? (S.ovAt ? "OVATION model, " + ltf.format(S.ovAt) : "") : "Estimated from Kp";
+  setFlow(flowMine, P, W, H, R * rad(1), true, null);
 }
+
+/* ---------- flowing aurora: a particle flow field over the oval (the technique behind animated wind maps) ----------
+   Particles are born where the oval is active, drift along it (along lines of constant magnetic latitude,
+   westward), move faster and glow brighter where activity is stronger, and leave trails that fade. */
+function auroraVal(lon, lat, global) {
+  if (S.ov && (!global || S.ovFull)) return ovAt(lon, lat);
+  const kp = kpAt(Date.now());
+  if (kp == null) return 0;
+  if (!global) return 40 * sig((lat - (63.5 - 1.6 * kp)) * 1.2);
+  const m = Math.abs(magLat(lat, lon));
+  return 40 * sig((m - (66.5 - 2.04 * kp)) * 1.2) * sig((75 + 0.5 * kp - m) * 0.8);
+}
+function flowDir(lon, lat) {
+  const e = 0.3, c = Math.max(0.08, Math.cos(rad(lat)));
+  const gy = (magLat(lat + e, lon) - magLat(lat - e, lon)) / (2 * e);
+  const gx = (magLat(lat, lon + e) - magLat(lat, lon - e)) / (2 * e) / c;
+  let tx = -gy, ty = gx; const n = Math.hypot(tx, ty) || 1; // perpendicular to the gradient: along the oval, westward
+  return [tx / n / c, ty / n];
+}
+const REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function makeFlow(baseId) {
+  const base = $(baseId);
+  if (REDUCE_MOTION || !base) return null;
+  const cv = document.createElement("canvas"); cv.className = "flow"; cv.setAttribute("aria-hidden", "true");
+  base.parentNode.insertBefore(cv, base.nextSibling);
+  const f = { base, cv, ctx: cv.getContext("2d"), parts: [], cells: [], total: 0, P: null, visible: true };
+  if ("IntersectionObserver" in window) new IntersectionObserver((es) => { f.visible = es[0].isIntersecting; }).observe(base);
+  return f;
+}
+function setFlow(f, P, W, H, pxPerDeg, global, b) {
+  if (!f) return;
+  const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && S.here ? S.here.lat + "," + S.here.lon : ""].join("|");
+  f.P = P;
+  if (f.key === key) return; // same view and data (e.g. a hover redraw): keep the particles flowing
+  f.key = key;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  f.cv.width = Math.round(W * dpr); f.cv.height = Math.round(H * dpr);
+  f.cv.style.width = W + "px"; f.cv.style.height = H + "px";
+  f.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  Object.assign(f, { P, W, H, pxPerDeg, global });
+  // where particles may be born: visible cells with some activity, weighted by strength
+  f.cells = []; f.total = 0;
+  const la0 = b ? Math.floor(b.s) : -89, la1 = b ? Math.ceil(b.n) : 89, lo0 = b ? Math.floor(b.w) : -180, lo1 = b ? Math.ceil(b.e) : 179;
+  for (let la = la0; la <= la1; la++) for (let lo = lo0; lo <= lo1; lo++) {
+    const v = auroraVal(lo, la, global);
+    if (v < 4) continue;
+    const [x, y, fr] = P(lo, la);
+    if ((fr !== undefined && fr < 0.2) || x < -10 || x > W + 10 || y < -10 || y > H + 10) continue;
+    f.total += v; f.cells.push([lo, la, f.total]);
+  }
+  const n = f.cells.length ? Math.round(clamp(W * H / 1500, 140, 650)) : 0;
+  f.parts = Array.from({ length: n }, () => spawn(f, true));
+}
+function spawn(f, anyAge) {
+  const r = Math.random() * f.total;
+  let lo = 0, hi = f.cells.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (f.cells[mid][2] < r) lo = mid + 1; else hi = mid; }
+  const cell = f.cells[lo];
+  const life = 70 + Math.random() * 110;
+  return { lon: cell[0] + Math.random() - 0.5, lat: cell[1] + Math.random() - 0.5, age: anyAge ? Math.random() * life : 0, life, seed: Math.random() * 6.28 };
+}
+const flowMain = makeFlow("map"), flowMine = makeFlow("mineMap");
+let flowT = 0;
+function flowFrame() {
+  requestAnimationFrame(flowFrame);
+  if (document.hidden) return;
+  flowT += 1;
+  for (const f of [flowMain, flowMine]) {
+    if (!f || !f.P || !f.visible || !f.parts.length || f.base.closest("[hidden]")) continue;
+    const c = f.ctx;
+    c.globalCompositeOperation = "destination-in"; c.fillStyle = "rgba(0,0,0,0.9)"; c.fillRect(0, 0, f.W, f.H); // fade the trails
+    c.globalCompositeOperation = "lighter"; c.lineWidth = 1.3; c.lineCap = "round";
+    for (let i = 0; i < f.parts.length; i++) {
+      const p = f.parts[i];
+      const v = clamp(auroraVal(Math.round(p.lon), Math.round(p.lat), f.global) / 35);
+      const [x0, y0] = f.P(p.lon, p.lat);
+      const [dx, dy] = flowDir(p.lon, p.lat);
+      const step = (0.7 + 2.2 * v) / f.pxPerDeg;
+      p.lon += dx * step; p.lat += dy * step + Math.sin(flowT * 0.03 + p.seed) * 0.12 * step;
+      if (p.lon > 180) p.lon -= 360; else if (p.lon < -180) p.lon += 360;
+      p.age++;
+      const [x1, y1, fr] = f.P(p.lon, p.lat);
+      if (p.age > p.life || v < 0.06 || (fr !== undefined && fr < 0.2) || x1 < -5 || x1 > f.W + 5 || y1 < -5 || y1 > f.H + 5) { f.parts[i] = spawn(f, false); continue; }
+      const k = p.age / p.life, fade = Math.min(1, k * 6, (1 - k) * 4);
+      const a = (0.22 + 0.6 * v) * fade;
+      c.strokeStyle = v > 0.6 ? "rgba(196,160,255," + a.toFixed(3) + ")" : "rgba(110,245,190," + a.toFixed(3) + ")";
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    }
+  }
+}
+if (flowMain || flowMine) requestAnimationFrame(flowFrame);
 
 /* ---------- hero sky ---------- */
 const sky = { intensity: 0.2, t: 0, stars: [] };
