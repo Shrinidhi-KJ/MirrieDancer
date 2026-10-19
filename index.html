@@ -183,7 +183,8 @@ select {
 .mapbox canvas { display: block; width: 100%; aspect-ratio: 0.92; max-width: 100%; }
 .legend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 400 11px/1.3 var(--mono); color: var(--mist); pointer-events: none; }
 .mapbox canvas { touch-action: manipulation; }
-.mapbox canvas.flow { position: absolute; left: 0; top: 0; width: auto; aspect-ratio: auto; pointer-events: none; }
+.mapbox canvas.flow, .mapbox canvas.precip { position: absolute; left: 0; top: 0; width: auto; aspect-ratio: auto; pointer-events: none; }
+.mapbox canvas.precip { mix-blend-mode: screen; }
 .tip {
   position: absolute; z-index: 2; left: 0; top: 0; width: min(290px, calc(100% - 20px));
   background: rgba(11, 18, 34, 0.95); border: 1px solid rgba(95, 240, 176, 0.28); border-radius: 14px;
@@ -215,7 +216,7 @@ select {
 @media (prefers-reduced-motion: reduce) { .aurora-num .wd { animation: none; color: var(--dancer); text-shadow: 0 0 12px rgba(95, 240, 176, 0.55); } }
 .spot.flash { animation: flash 1.8s ease-out; }
 @keyframes flash { 0% { background: rgba(95, 240, 176, 0.22); box-shadow: inset 0 0 0 2px var(--dancer); } 100% { background: var(--peat); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); } }
-.ramp { display: inline-block; width: 90px; height: 6px; border-radius: 3px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, rgba(95, 240, 176, 0), rgba(95, 240, 176, .6), var(--heather)); }
+.ramp { display: inline-block; width: 90px; height: 6px; border-radius: 3px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, rgba(20, 120, 96, 0.5), #22b076 20%, #5ff0b0 42%, #afffdc 60%, #3cc6c9 74%, #968cff 87%, #ff7fb0); }
 
 /* tonight */
 .tonight { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
@@ -980,7 +981,7 @@ function drawMap() {
 
   // aurora oval glow from OVATION (or a Kp-based stand-in), drawn smoothly per pixel
   const kpNow = kpAt(Date.now());
-  paintGlow(c, W, H, (x, y) => [BOX.w + (x - ox) / (KX * s), BOX.n - (y - oy) / s], false, (a) => a * 0.6);
+  // (the oval itself is drawn by the precipitation-style layer on top of the map)
 
   // land
   c.beginPath();
@@ -1024,7 +1025,8 @@ function drawMap() {
     if (sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
   $("ovTime").textContent = S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : (S.ov ? "" : "Estimated from Kp");
-  setFlow(flowMain, P, W, H, s, false, { w: BOX.w - 1, e: BOX.e + 1, s: BOX.s - 1, n: BOX.n + 3 });
+  setFlow(flowMain, P, W, H, s, false, { w: BOX.w - 1, e: BOX.e + 1, s: BOX.s - 1, n: BOX.n + 3 },
+    (x, y) => [BOX.w + (x - ox) / (KX * s), BOX.n - (y - oy) / s]);
 }
 
 /* ---------- the visitor's own map: their coastline, their position and the live aurora oval ---------- */
@@ -1066,17 +1068,14 @@ function drawMineMap() {
   c.setLineDash([]);
   // aurora oval: NOAA's OVATION model, or a stand-in from Kp and magnetic latitude
   const kpNow = kpAt(Date.now());
-  // aurora oval, worked out per pixel through the inverse of the globe projection
-  c.globalCompositeOperation = "screen";
-  paintGlow(c, W, H, (x, y) => {
+  const inv = (x, y) => { // inverse of the globe projection, for the oval layer
     const X = (x - W / 2) / R, Y = (H / 2 - y) / R, rho = Math.hypot(X, Y);
     if (rho >= 1) return null;
     const cc = Math.asin(rho), sc = Math.sin(cc), ccos = Math.cos(cc);
     const lat = rho < 1e-9 ? lat0 : Math.asin(ccos * sf0 + Y * sc * cf0 / rho) * 180 / Math.PI;
     const lon = lon0 + Math.atan2(X * sc, rho * ccos * cf0 - Y * sc * sf0) * 180 / Math.PI;
     return [lon, lat];
-  }, true, (a) => 0.06 + 0.3 * a);
-  c.globalCompositeOperation = "source-over";
+  };
   // the visitor
   const [ux, uy] = P(S.here.lon, S.here.lat);
   c.beginPath(); c.arc(ux, uy, 11, 0, Math.PI * 2); c.fillStyle = "rgba(244,184,96,0.18)"; c.fill();
@@ -1085,27 +1084,69 @@ function drawMineMap() {
   const lab = "You" + (S.here.source === "ip" ? " (approx.)" : "");
   c.fillText(lab, ux + 12 + c.measureText(lab).width > W - 8 ? ux - 12 - c.measureText(lab).width : ux + 12, uy + 4);
   $("mineMapNote").textContent = S.ov && S.ovFull ? (S.ovAt ? "OVATION model, " + ltf.format(S.ovAt) : "") : "Estimated from Kp";
-  setFlow(flowMine, P, W, H, R * rad(1), true, null);
+  setFlow(flowMine, P, W, H, R * rad(1), true, null, inv);
 }
 
-/* soft glow: work out the aurora value for every pixel of a quarter-size canvas, then scale it up with a light blur */
-function paintGlow(c, W, H, inv, global, alpha) {
-  const q = 4, ow = Math.ceil(W / q), oh = Math.ceil(H / q), off = document.createElement("canvas");
-  off.width = ow; off.height = oh;
-  const oc = off.getContext("2d"), img = oc.createImageData(ow, oh), d = img.data;
+/* ---------- precipitation-map look for the oval ----------
+   The aurora value is roughened with drifting value noise (the clumpy, radar-like texture), then mapped
+   through a banded colour scale with soft edges between bands, and screened over the map. */
+function hash2(x, y) { let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const fbm = (x, y) => 0.62 * vnoise(x, y) + 0.38 * vnoise(x * 2.3 + 11.7, y * 2.3 - 4.1);
+// aurora palette, faint to strong: deep teal, green, aurora green, pale mint core, teal, then violet and pink only for strong activity
+const RAMP = [[0.07, [16, 96, 84, 0]], [0.14, [20, 120, 96, 0.3]], [0.27, [34, 176, 118, 0.44]], [0.43, [95, 240, 176, 0.56]],
+  [0.6, [175, 255, 220, 0.62]], [0.74, [60, 198, 201, 0.64]], [0.86, [150, 140, 255, 0.7]], [0.96, [255, 127, 176, 0.78]]];
+const RAMP_LUT = (() => {
+  const lut = new Uint8ClampedArray(256 * 4);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255; let col = [0, 0, 0, 0];
+    if (v >= RAMP[RAMP.length - 1][0]) col = RAMP[RAMP.length - 1][1];
+    else for (let j = 1; j < RAMP.length; j++) if (v < RAMP[j][0]) {
+      const [p0, c0] = RAMP[j - 1], [p1, c1] = RAMP[j];
+      let k = (v - p0) / (p1 - p0);
+      k = k < 0.62 ? 0 : (k - 0.62) / 0.38; k = k * k * (3 - 2 * k); // mostly flat bands, soft step into the next
+      col = c0.map((x, n) => x + (c1[n] - x) * k);
+      break;
+    }
+    lut[i * 4] = col[0]; lut[i * 4 + 1] = col[1]; lut[i * 4 + 2] = col[2]; lut[i * 4 + 3] = Math.round(col[3] * 255);
+  }
+  return lut;
+})();
+function buildPrecip(f, inv) {
+  const q = 3, ow = Math.ceil(f.W / q), oh = Math.ceil(f.H / q);
+  const cv = document.createElement("canvas"); cv.width = ow; cv.height = oh;
+  const ctx = cv.getContext("2d"), img = ctx.createImageData(ow, oh);
+  const idx = [], lon = [], lat = [], val = [];
   for (let py = 0; py < oh; py++) for (let px = 0; px < ow; px++) {
     const ll = inv(px * q + q / 2, py * q + q / 2);
     if (!ll) continue;
-    const a = clamp(auroraVal(ll[0], ll[1], global) / 35);
-    if (a < 0.02) continue;
-    const o = (py * ow + px) * 4;
-    d[o] = 95 + a * 85; d[o + 1] = 240 - a * 100; d[o + 2] = 176 + a * 79; d[o + 3] = Math.round(alpha(a) * 255);
+    const a = clamp(auroraVal(ll[0], ll[1], f.global) / 35);
+    if (a < 0.03) continue;
+    idx.push((py * ow + px) * 4); lon.push(ll[0]); lat.push(ll[1]); val.push(a);
   }
-  oc.putImageData(img, 0, 0);
+  f.pg = { q, ow, oh, cv, ctx, img, idx, lon: Float32Array.from(lon), lat: Float32Array.from(lat), val: Float32Array.from(val) };
+}
+function renderPrecip(f, t) {
+  const g = f.pg;
+  if (!g) return;
+  const d = g.img.data;
+  for (let k = 0; k < g.idx.length; k++) {
+    const n = fbm(g.lon[k] * 0.55 + t * 0.35, g.lat[k] * 1.25 - t * 0.06); // drifts westward along the oval
+    const v = clamp(g.val[k] * (0.68 + 0.6 * n));
+    const li = Math.round(v * 255) * 4, o = g.idx[k];
+    d[o] = RAMP_LUT[li]; d[o + 1] = RAMP_LUT[li + 1]; d[o + 2] = RAMP_LUT[li + 2]; d[o + 3] = RAMP_LUT[li + 3];
+  }
+  g.ctx.putImageData(g.img, 0, 0);
+  const c = f.pctx;
+  c.clearRect(0, 0, f.W, f.H);
   c.save();
   c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
-  if ("filter" in c) c.filter = "blur(" + Math.round(q * 1.5) + "px)";
-  c.drawImage(off, 0, 0, ow * q, oh * q);
+  if ("filter" in c) c.filter = "blur(2.5px)";
+  c.drawImage(g.cv, 0, 0, g.ow * g.q, g.oh * g.q);
   c.restore();
 }
 
@@ -1130,24 +1171,30 @@ function flowDir(lon, lat) {
 const REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function makeFlow(baseId) {
   const base = $(baseId);
-  if (REDUCE_MOTION || !base) return null;
+  if (!base) return null;
+  const pre = document.createElement("canvas"); pre.className = "precip"; pre.setAttribute("aria-hidden", "true");
   const cv = document.createElement("canvas"); cv.className = "flow"; cv.setAttribute("aria-hidden", "true");
   base.parentNode.insertBefore(cv, base.nextSibling);
-  const f = { base, cv, ctx: cv.getContext("2d"), parts: [], cells: [], total: 0, P: null, visible: true };
+  base.parentNode.insertBefore(pre, cv);
+  const f = { base, cv, ctx: cv.getContext("2d"), pre, pctx: pre.getContext("2d"), parts: [], cells: [], total: 0, P: null, visible: true, anim: !REDUCE_MOTION };
   if ("IntersectionObserver" in window) new IntersectionObserver((es) => { f.visible = es[0].isIntersecting; }).observe(base);
   return f;
 }
-function setFlow(f, P, W, H, pxPerDeg, global, b) {
+function setFlow(f, P, W, H, pxPerDeg, global, b, inv) {
   if (!f) return;
   const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && S.here ? S.here.lat + "," + S.here.lon : ""].join("|");
   f.P = P;
   if (f.key === key) return; // same view and data (e.g. a hover redraw): keep the particles flowing
   f.key = key;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  f.cv.width = Math.round(W * dpr); f.cv.height = Math.round(H * dpr);
-  f.cv.style.width = W + "px"; f.cv.style.height = H + "px";
-  f.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const [cv, ctx] of [[f.cv, f.ctx], [f.pre, f.pctx]]) {
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
   Object.assign(f, { P, W, H, pxPerDeg, global });
+  buildPrecip(f, inv);
+  renderPrecip(f, flowT / 60);
   // where particles may be born: visible cells with some activity, weighted by strength
   f.cells = []; f.total = 0;
   const la0 = b ? Math.floor(b.s) : -89, la1 = b ? Math.ceil(b.n) : 89, lo0 = b ? Math.floor(b.w) : -180, lo1 = b ? Math.ceil(b.e) : 179;
@@ -1159,7 +1206,7 @@ function setFlow(f, P, W, H, pxPerDeg, global, b) {
     f.total += v; f.cells.push([lo, la, f.total]);
   }
   const n = f.cells.length ? Math.round(clamp(W * H / 1500, 140, 650)) : 0;
-  f.parts = Array.from({ length: n }, () => spawn(f, true));
+  f.parts = f.anim ? Array.from({ length: n }, () => spawn(f, true)) : [];
 }
 function spawn(f, anyAge) {
   const r = Math.random() * f.total;
@@ -1169,14 +1216,16 @@ function spawn(f, anyAge) {
   const life = 70 + Math.random() * 110;
   return { lon: cell[0] + Math.random() - 0.5, lat: cell[1] + Math.random() - 0.5, age: anyAge ? Math.random() * life : 0, life, seed: Math.random() * 6.28 };
 }
-const flowMain = makeFlow("map"), flowMine = makeFlow("mineMap");
 let flowT = 0;
+const flowMain = makeFlow("map"), flowMine = makeFlow("mineMap");
 function flowFrame() {
   requestAnimationFrame(flowFrame);
   if (document.hidden) return;
   flowT += 1;
   for (const f of [flowMain, flowMine]) {
-    if (!f || !f.P || !f.visible || !f.parts.length || f.base.closest("[hidden]")) continue;
+    if (!f || !f.P || !f.visible || f.base.closest("[hidden]")) continue;
+    if (flowT % 5 === 0) renderPrecip(f, flowT / 60); // the oval's texture drifts at ~12 fps
+    if (!f.parts.length) continue;
     const c = f.ctx;
     c.globalCompositeOperation = "destination-in"; c.fillStyle = "rgba(0,0,0,0.9)"; c.fillRect(0, 0, f.W, f.H); // fade the trails
     c.globalCompositeOperation = "lighter"; c.lineWidth = 1.3; c.lineCap = "round";
@@ -1198,7 +1247,7 @@ function flowFrame() {
     }
   }
 }
-if (flowMain || flowMine) requestAnimationFrame(flowFrame);
+if (!REDUCE_MOTION && (flowMain || flowMine)) requestAnimationFrame(flowFrame);
 
 /* ---------- hero sky ---------- */
 const sky = { intensity: 0.2, t: 0, stars: [] };
