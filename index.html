@@ -189,16 +189,16 @@ select {
 @media (hover: none) { .maphint .mouse { display: none; } .maphint .touch { display: inline; } }
 /* chances above 50%: an aurora wave flows through the number */
 .aurora-num {
-  background: linear-gradient(110deg, var(--dancer) 0%, var(--teal) 20%, var(--heather) 40%, var(--rose) 52%, var(--heather) 64%, var(--dancer) 82%, var(--teal) 100%);
-  background-size: 300% 100%;
+  background: linear-gradient(100deg, var(--dancer) 0%, #b9ffe0 12%, var(--teal) 25%, var(--heather) 42%, var(--rose) 55%, var(--heather) 68%, var(--dancer) 85%, #b9ffe0 100%);
+  background-size: 220% 100%;
   -webkit-background-clip: text; background-clip: text;
   color: transparent !important; -webkit-text-fill-color: transparent;
-  animation: auroraWave 7s ease-in-out infinite alternate;
-  filter: drop-shadow(0 0 12px rgba(95, 240, 176, 0.35));
+  animation: auroraWave 2.2s ease-in-out infinite alternate, auroraGlow 2.2s ease-in-out infinite alternate;
 }
 .aurora-num small { -webkit-text-fill-color: var(--mist); color: var(--mist) !important; }
 @keyframes auroraWave { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
-@media (prefers-reduced-motion: reduce) { .aurora-num { animation: none; background-position: 30% 50%; } }
+@keyframes auroraGlow { 0% { filter: drop-shadow(0 0 6px rgba(95, 240, 176, 0.45)); } 100% { filter: drop-shadow(0 0 14px rgba(180, 140, 255, 0.6)); } }
+@media (prefers-reduced-motion: reduce) { .aurora-num { animation: none; background-position: 30% 50%; filter: drop-shadow(0 0 10px rgba(95, 240, 176, 0.45)); } }
 .spot.flash { animation: flash 1.8s ease-out; }
 @keyframes flash { 0% { background: rgba(95, 240, 176, 0.22); box-shadow: inset 0 0 0 2px var(--dancer); } 100% { background: var(--peat); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); } }
 .ramp { display: inline-block; width: 90px; height: 6px; border-radius: 3px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, rgba(95, 240, 176, 0), rgba(95, 240, 176, .6), var(--heather)); }
