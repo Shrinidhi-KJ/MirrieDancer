@@ -27,10 +27,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Restore hero footage
+        uses: actions/cache@v4
+        with:
+          path: media
+          key: hero-media-v1-${{ hashFiles('scripts/hero-media.sh') }}
+      - name: Prepare hero footage (first run only)
+        run: bash scripts/hero-media.sh media
       - name: Build site with a fresh data snapshot
         run: |
           mkdir -p _site/data
           cp index.html _site/
+          if [ -d media ]; then cp -r media _site/media; fi
           node scripts/snapshot.mjs _site/data
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
