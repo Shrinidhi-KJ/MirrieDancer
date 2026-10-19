@@ -157,6 +157,8 @@ select {
 .minefacts dd small { font: 400 12px/1.3 var(--mono); color: var(--mist); display: block; margin-top: 3px; letter-spacing: 0; }
 .mapbox canvas#map { touch-action: pan-y; cursor: grab; } /* one finger up/down still scrolls the page */
 .mapbox.dragging canvas#map { cursor: grabbing; }
+.mapbox.flat canvas#map { aspect-ratio: 1.7; }
+@media (max-width: 700px) { .mapbox.flat canvas#map { aspect-ratio: 1.3; } }
 @media (max-width: 700px) {
   .maptools .seg button, .maptools .btn { padding: 5px 9px; font-size: 12px; min-width: 0; }
 }
@@ -376,16 +378,17 @@ footer p { margin: 0; max-width: 90ch; }
           <div class="youpin" id="mapPin" hidden><i class="dot"></i><span></span></div>
           <div class="maptools">
             <div class="seg" role="group" aria-label="Map view">
-              <button type="button" id="viewScot" aria-pressed="true">Scotland</button>
-              <button type="button" id="viewWorld" aria-pressed="false">Whole world</button>
+              <button type="button" id="viewGlobe" aria-pressed="true">Globe</button>
+              <button type="button" id="viewMap" aria-pressed="false">Map</button>
             </div>
             <div class="zoom">
               <button type="button" class="btn" id="zoomOut" aria-label="Zoom out">−</button>
               <button type="button" class="btn" id="zoomIn" aria-label="Zoom in">+</button>
+              <button type="button" class="btn" id="recenter">Recenter</button>
             </div>
           </div>
         </div>
-        <p class="maphint"><span class="mouse">Drag to move the map, scroll to zoom. Hover a spot for its details, click it to find it in the list.</span><span class="touch">Swipe sideways or use two fingers to move the map, pinch to zoom. Tap a spot for its details, tap again to find it in the list.</span></p>
+        <p class="maphint"><span class="mouse">Drag to spin the globe, scroll to zoom out to the whole planet. Hover a spot for its details, click it to find it in the list.</span><span class="touch">Swipe sideways or use two fingers to spin the globe, pinch to zoom. Tap a spot for its details, tap again to find it in the list.</span></p>
         </div>
       </div>
     </div>
@@ -988,69 +991,124 @@ const land = LAND.split(";").map(r => { const v = r.split(",").map(Number), pts 
 const world = WORLD.split(";").map(r => { const v = r.split(",").map(Number), pts = []; let x = 0, y = 0; for (let i = 0; i < v.length; i += 2) { x += v[i]; y += v[i + 1]; pts.push([x / 10, y / 10]); } return pts; });
 const BOX = { w: -9.4, e: 1.6, s: 54.55, n: 61.0 };
 const KX = Math.cos(rad(57.7));
-/* one map: opens on Scotland; drag to move, zoom out to follow the oval round the world */
-const MV = { custom: false, lonC: -3.9, latC: 57.8, zoom: 1, dragging: false, justDragged: false, fit: 1 };
+/* one map, two ways to look at it:
+   Globe: a 3D globe that opens zoomed in on you (or Scotland) and pulls back to the whole planet;
+   Map: a flat map of the whole world. Both can be dragged and zoomed. */
+const MV = { mode: "globe", g: { custom: false, lat: 0, lon: 0, R: 0 }, m: { custom: false, lonC: 0, latC: 15, s: 1 }, dragging: false, justDragged: false };
 const DETAIL = { w: -10.5, e: 3.5, s: 53.6, n: 61.4 }; // where the detailed Scotland coastline applies
 const wrapLon = (d) => ((d % 360) + 540) % 360 - 180;
-function mapView(W, H) {
-  const KX0 = Math.cos(rad(57.7));
-  const fit = Math.min(W / ((BOX.e - BOX.w) * KX0), H / (BOX.n - BOX.s));
-  MV.fit = fit;
-  if (!MV.custom) return { lonC: (BOX.w + BOX.e) / 2, latC: (BOX.s + BOX.n) / 2, s: fit, KX: KX0 };
-  return { lonC: MV.lonC, latC: MV.latC, s: fit * MV.zoom, KX: Math.cos(rad(clamp(MV.latC, -65, 65))) };
-}
-const minZoom = (W) => (W / (360 * Math.cos(rad(25)))) / MV.fit; // the whole world fits across
 function drawMap(fast) {
-  const cv = $("map"), r = cv.getBoundingClientRect();
+  const box = $("mapbox"), cv = $("map");
+  box.classList.toggle("flat", MV.mode === "map");
+  const r = cv.getBoundingClientRect();
   if (!r.width) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
   const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = r.width, H = r.height;
-  const v = mapView(W, H), s = v.s, KX = v.KX, lonC = v.lonC, latC = v.latC;
-  MV.cur = v;
-  const P = (lon, lat) => [W / 2 + wrapLon(lon - lonC) * KX * s, H / 2 - (lat - latC) * s];
-  const inv = (x, y) => { const lat = latC - (y - H / 2) / s; return Math.abs(lat) > 89.5 ? null : [lonC + (x - W / 2) / (KX * s), lat]; };
-  c.clearRect(0, 0, W, H);
-  const css = getComputedStyle(document.documentElement);
-  const col = (n) => css.getPropertyValue(n).trim();
+  const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
   const kpNow = kpAt(Date.now());
+  const abroadRef = S.abroad && S.here ? S.here : null;
+  let P, inv, pxPerDeg, bounds = null, local = false;
+  c.clearRect(0, 0, W, H);
 
-  // land: the world outline everywhere except Scotland, where the detailed coastline takes over
-  const kS = Math.round((lonC - (DETAIL.w + DETAIL.e) / 2) / 360) * 360; // which copy of the world holds Scotland
-  const X = (lon, k) => W / 2 + (lon - lonC + k) * KX * s, Y = (lat) => H / 2 - (lat - latC) * s;
-  c.save();
-  c.beginPath(); c.rect(0, 0, W, H); c.rect(X(DETAIL.w, kS), Y(DETAIL.n), (DETAIL.e - DETAIL.w) * KX * s, (DETAIL.n - DETAIL.s) * s); c.clip("evenodd");
-  c.beginPath();
-  const span = W / (KX * s);
-  for (const k of [-360, 0, 360]) {
-    if (Math.abs(k) && span < 120 && Math.abs(wrapLon(lonC) - lonC + k) > 400) continue;
-    for (const ring of world) { let prev = null; ring.forEach(([lon, lat], i) => { const x = X(lon, k), y = Y(lat); if (!i || Math.abs(lon - prev) > 180) c.moveTo(x, y); else c.lineTo(x, y); prev = lon; }); }
-  }
-  c.fillStyle = col("--peat"); c.globalAlpha = 0.92; c.fill("evenodd"); c.globalAlpha = 1;
-  c.strokeStyle = "rgba(233,238,246,0.2)"; c.lineWidth = 0.7; c.stroke();
-  c.restore();
-  c.beginPath();
-  for (const ring of land) ring.forEach(([lon, lat], i) => { const x = X(lon, kS), y = Y(lat); i ? c.lineTo(x, y) : c.moveTo(x, y); });
-  c.fillStyle = col("--peat"); c.globalAlpha = 0.92; c.fill("evenodd"); c.globalAlpha = 1;
-  c.strokeStyle = "rgba(233,238,246,0.22)"; c.lineWidth = 0.8; c.stroke();
+  const drawRing = (ring, proj, guard) => { let prev = null; ring.forEach(([lon, lat], i) => { const [x, y] = proj(lon, lat); if (!i || (guard && Math.abs(lon - prev) > 180)) c.moveTo(x, y); else c.lineTo(x, y); prev = lon; }); };
+  const fillLand = (alpha, line) => { c.fillStyle = col("--peat"); c.globalAlpha = alpha; c.fill("evenodd"); c.globalAlpha = 1; c.strokeStyle = "rgba(233,238,246," + line + ")"; c.lineWidth = 0.75; c.stroke(); };
 
-  // latitude labels (and faint lines once zoomed out)
-  const step = s > 30 ? 1 : s > 9 ? 5 : s > 3.5 ? 10 : 30;
-  c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
-  const latTop = latC + H / 2 / s, latBot = latC - H / 2 / s;
-  for (let lat = Math.ceil(Math.max(-85, latBot) / step) * step; lat <= Math.min(85, latTop); lat += step) {
-    const y = Y(lat);
-    if (y < 46 || y > H - 26) continue;
-    if (step > 1) { c.save(); c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.08)"; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); c.restore(); }
-    c.fillText(Math.abs(lat) + "°" + (lat > 0 ? "N" : lat < 0 ? "S" : ""), 8, y + 3);
+  if (MV.mode === "globe") {
+    const fitR = Math.min((H / 2) / rad((BOX.n - BOX.s) / 2), (W / 2) / (rad((BOX.e - BOX.w) / 2) * Math.cos(rad(57.7))));
+    MV.fitR = fitR; MV.minR = Math.min(W, H) / 2 * 0.9;
+    const g = MV.g;
+    let lat0, lon0, R;
+    if (g.custom) { lat0 = g.lat; lon0 = g.lon; R = g.R; }
+    else if (abroadRef) { lat0 = clamp(abroadRef.lat + 4 * (abroadRef.lat < 0 ? -1 : 1), -85, 85); lon0 = abroadRef.lon; R = fitR / 2.6; }
+    else { lat0 = (BOX.s + BOX.n) / 2; lon0 = (BOX.w + BOX.e) / 2; R = fitR; local = true; }
+    R = clamp(R, MV.minR, fitR * 5);
+    MV.cur = { lat0, lon0, R };
+    const f0 = rad(lat0), sf0 = Math.sin(f0), cf0 = Math.cos(f0), l0 = rad(lon0), cx = W / 2, cy = H / 2;
+    P = (lon, lat) => {
+      const f = rad(lat), dl = rad(lon) - l0, cf = Math.cos(f), sf = Math.sin(f);
+      let x = cf * Math.sin(dl), y = cf0 * sf - sf0 * cf * Math.cos(dl);
+      const front = sf0 * sf + cf0 * cf * Math.cos(dl);
+      if (front < 0) { const n = Math.hypot(x, y) || 1; x /= n; y /= n; } // behind the globe: pinned to its edge
+      return [cx + R * x, cy - R * y, front];
+    };
+    inv = (x, y) => {
+      const X = (x - cx) / R, Y = (cy - y) / R, rho = Math.hypot(X, Y);
+      if (rho >= 1) return null;
+      const cc = Math.asin(rho), sc = Math.sin(cc), ccos = Math.cos(cc);
+      const lat = rho < 1e-9 ? lat0 : Math.asin(ccos * sf0 + Y * sc * cf0 / rho) * 180 / Math.PI;
+      return [lon0 + Math.atan2(X * sc, rho * ccos * cf0 - Y * sc * sf0) * 180 / Math.PI, lat];
+    };
+    pxPerDeg = R * rad(1);
+    // atmosphere and ocean, for the 3D look once the globe's edge is in view
+    const g1 = c.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.12);
+    g1.addColorStop(0, "rgba(95,240,176,0.10)"); g1.addColorStop(0.4, "rgba(60,198,201,0.05)"); g1.addColorStop(1, "rgba(60,198,201,0)");
+    c.fillStyle = g1; c.beginPath(); c.arc(cx, cy, R * 1.12, 0, Math.PI * 2); c.fill();
+    const g2 = c.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+    g2.addColorStop(0, "#1c2a46"); g2.addColorStop(1, "#0a1120");
+    c.fillStyle = g2; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.fill();
+    // graticule
+    const degPer100 = 100 / pxPerDeg, step = [1, 2, 5, 10, 15, 30].find((d) => d >= degPer100 * 0.8) || 30;
+    c.save(); c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.07)"; c.lineWidth = 1;
+    if (step >= 5) for (let lo = -180; lo < 180; lo += step) { c.beginPath(); let on = false; for (let la = -88; la <= 88; la += 2) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } c.stroke(); }
+    for (let la = -80; la <= 80; la += Math.max(step, 1)) { c.beginPath(); let on = false; for (let lo = -180; lo <= 180; lo += Math.max(1, step / 5)) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } c.stroke(); }
+    c.restore();
+    // land: the world outline, with the detailed Scotland coastline taking over where it applies
+    const edge = [];
+    for (let i = 0; i <= 20; i++) edge.push([DETAIL.w + (DETAIL.e - DETAIL.w) * i / 20, DETAIL.n]);
+    for (let i = 0; i <= 20; i++) edge.push([DETAIL.e, DETAIL.n - (DETAIL.n - DETAIL.s) * i / 20]);
+    for (let i = 0; i <= 20; i++) edge.push([DETAIL.e - (DETAIL.e - DETAIL.w) * i / 20, DETAIL.s]);
+    for (let i = 0; i <= 20; i++) edge.push([DETAIL.w, DETAIL.s + (DETAIL.n - DETAIL.s) * i / 20]);
+    const detailVisible = edge.every(([lo, la]) => P(lo, la)[2] > 0.05);
+    c.save();
+    if (detailVisible) { c.beginPath(); c.rect(0, 0, W, H); edge.forEach(([lo, la], i) => { const [x, y] = P(lo, la); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.clip("evenodd"); }
+    c.beginPath(); for (const ring of world) drawRing(ring, P, false); fillLand(0.95, 0.2);
+    c.restore();
+    if (detailVisible) { c.beginPath(); for (const ring of land) drawRing(ring, P, false); fillLand(0.95, 0.22); }
+    // latitude labels down the left
+    c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
+    const lstep = step >= 5 ? step : 1;
+    for (let la = -80; la <= 85; la += lstep) { const [, y, fr] = P(lon0, la); if (fr > 0.1 && y > 46 && y < H - 26) c.fillText(Math.abs(la) + "°" + (la > 0 ? "N" : la < 0 ? "S" : ""), 8, y + 3); }
+  } else {
+    const m = MV.m, fitS = W / 360;
+    MV.fitS = fitS;
+    let lonC, latC, sc;
+    if (m.custom) { lonC = m.lonC; latC = m.latC; sc = m.s; }
+    else { const ref = S.here || S.townObj; lonC = ref ? Math.round(ref.lon) : 0; latC = 12; sc = fitS; }
+    sc = clamp(sc, fitS, fitS * 40);
+    const KX = 1 + (Math.cos(rad(clamp(latC, -65, 65))) - 1) * clamp((sc / fitS - 1) / 4, 0, 1); // flat for the world, true-ish shapes up close
+    MV.cur = { lonC, latC, s: sc, KX };
+    P = (lon, lat) => [W / 2 + wrapLon(lon - lonC) * KX * sc, H / 2 - (lat - latC) * sc];
+    inv = (x, y) => { const lat = latC - (y - H / 2) / sc; return Math.abs(lat) > 89.5 ? null : [lonC + (x - W / 2) / (KX * sc), lat]; };
+    pxPerDeg = sc;
+    const X = (lon, k) => W / 2 + (lon - lonC + k) * KX * sc, Y = (lat) => H / 2 - (lat - latC) * sc;
+    const kS = Math.round((lonC - (DETAIL.w + DETAIL.e) / 2) / 360) * 360;
+    c.save();
+    c.beginPath(); c.rect(0, 0, W, H); c.rect(X(DETAIL.w, kS), Y(DETAIL.n), (DETAIL.e - DETAIL.w) * KX * sc, (DETAIL.n - DETAIL.s) * sc); c.clip("evenodd");
+    c.beginPath();
+    for (const k of [-360, 0, 360]) for (const ring of world) drawRing(ring, (lon, lat) => [X(lon, k), Y(lat)], true);
+    fillLand(0.92, 0.2);
+    c.restore();
+    c.beginPath(); for (const ring of land) drawRing(ring, (lon, lat) => [X(lon, kS), Y(lat)], false); fillLand(0.92, 0.22);
+    const step = sc > 30 ? 1 : sc > 9 ? 5 : sc > 3.5 ? 10 : 30;
+    c.font = "10px " + col("--mono"); c.fillStyle = col("--dim");
+    const latTop = latC + H / 2 / sc, latBot = latC - H / 2 / sc;
+    for (let la = Math.ceil(Math.max(-85, latBot) / step) * step; la <= Math.min(85, latTop); la += step) {
+      const y = Y(la); if (y < 46 || y > H - 26) continue;
+      c.save(); c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.08)"; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); c.restore();
+      c.fillText(Math.abs(la) + "°" + (la > 0 ? "N" : la < 0 ? "S" : ""), 8, y + 3);
+    }
+    bounds = { w: lonC - W / 2 / (KX * sc) - 1, e: lonC + W / 2 / (KX * sc) + 1, s: Math.max(-89, latBot - 1), n: Math.min(89, latTop + 1) };
   }
+  const visible = (x, y, fr) => (fr === undefined || fr > 0.05) && x > 4 && x < W - 4 && y > 4 && y < H - 4;
 
   // you (or the chosen town)
   const t = S.here || S.townObj;
   if (t) {
-    const [x, y] = P(t.lon, t.lat), inView = x > 4 && x < W - 4 && y > 4 && y < H - 4;
-    placePin($("mapPin"), x, y, W, H, S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : t.name, !S.here);
+    const [x, y, fr] = P(t.lon, t.lat), inView = visible(x, y, fr);
+    const pin = $("mapPin");
+    if (inView) placePin(pin, x, y, W, H, S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : t.name, !S.here); else pin.hidden = true;
     if (!inView && S.here) {
       // off the map: an arrow on the edge pointing towards you
       const dx0 = x - W / 2, dy0 = y - H / 2, n = Math.hypot(dx0, dy0) || 1, dx = dx0 / n, dy = dy0 / n;
@@ -1059,37 +1117,36 @@ function drawMap(fast) {
       c.save(); c.translate(ex, ey); c.rotate(Math.atan2(dy, dx));
       c.beginPath(); c.moveTo(12, 0); c.lineTo(-6, -8); c.lineTo(-2, 0); c.lineTo(-6, 8); c.closePath();
       c.fillStyle = "#0a84ff"; c.fill(); c.restore();
-      const lab = "You" + (S.abroad ? " · " + (Math.round(S.nearestSpotKm / 10) * 10).toLocaleString("en-GB") + " km" : "");
-      c.font = "600 12px " + col("--body"); const lw = c.measureText(lab).width;
-      c.fillStyle = col("--frost"); c.fillText(lab, clamp(ex - dx * (lw / 2 + 22) - lw / 2, 8, W - lw - 8), clamp(ey - dy * 22 + 4, 60, H - 30));
+      c.font = "600 12px " + col("--body"); const lw = c.measureText("You").width;
+      c.fillStyle = col("--frost"); c.fillText("You", clamp(ex - dx * (lw / 2 + 20) - lw / 2, 8, W - lw - 8), clamp(ey - dy * 20 + 4, 60, H - 30));
       c.font = "10px " + col("--mono");
     }
   }
 
   // spots
   S.mapPts = [];
+  const zoomK = clamp(Math.sqrt(pxPerDeg / (MV.mode === "globe" ? MV.fitR * rad(1) : 50)), 0.45, 1.25);
   for (const r of S.ranked) {
-    const [x, y] = P(r.s.lon, r.s.lat), sel = r.s.id === S.sel;
-    const p = r.best.p, rad0 = (4 + p / 14) * clamp(Math.sqrt(s / MV.fit), 0.45, 1.25);
+    const [x, y, fr] = P(r.s.lon, r.s.lat);
+    if (!visible(x, y, fr)) continue;
+    const sel = r.s.id === S.sel, p = r.best.p, rad0 = (4 + p / 14) * zoomK;
     const cc = p >= 60 ? col("--heather") : p >= 35 ? col("--dancer") : p >= 15 ? col("--teal") : col("--dim");
     S.mapPts.push({ id: r.s.id, x, y, r: Math.max(rad0, 5) });
     if (r.s.id === hoverId && !sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.globalAlpha = 0.6; c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
     c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
     c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
-    if (sel && s > MV.fit * 0.5) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
+    if (sel && zoomK > 0.7) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
-  $("ovTime").textContent = S.ov && (S.ovFull || !MV.custom) ? (S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : "") : "Estimated from Kp";
+  $("ovTime").textContent = S.ov && (S.ovFull || local) ? (S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : "") : "Estimated from Kp";
 
   // the oval layers (radar-style glow and flowing particles) for whatever is in view
-  const lonW = lonC - W / 2 / (KX * s), lonE = lonC + W / 2 / (KX * s);
-  setFlow(flowMain, P, W, H, s, true, { w: lonW - 1, e: lonE + 1, s: Math.max(-89, latBot - 1), n: Math.min(89, latTop + 1) }, inv, fast);
+  setFlow(flowMain, P, W, H, pxPerDeg, true, bounds, inv, fast);
 
   // nothing in view: say where the oval is
   if (flowMain && !flowMain.cells.length && (S.ov || kpNow != null)) {
-    let edge = null;
-    for (let la = Math.ceil(latTop); la <= 82 && edge == null; la += 0.5) for (let lo = Math.floor(lonC) - 4; lo <= Math.ceil(lonC) + 4; lo += 2) if (auroraVal(lo, la, true) >= 4) { edge = la; break; }
-    const msg = !MV.custom && edge != null ? "Aurora oval: about " + Math.round((edge - 60.15) * 111 / 50) * 50 + " km north of Shetland. Zoom out to see it"
-      : edge != null ? "Aurora oval: about " + Math.round((edge - latTop) * 111 / 50) * 50 + " km north of the map" : "No aurora in view. Zoom out to find the oval";
+    let edgeLat = null;
+    if (local) for (let la = 61.5; la <= 82 && edgeLat == null; la += 0.5) for (let lo = -6; lo <= 2; lo += 2) if (auroraVal(lo, la) >= 4) { edgeLat = la; break; }
+    const msg = edgeLat != null ? "Aurora oval: about " + Math.round((edgeLat - 60.15) * 111 / 50) * 50 + " km north of Shetland. Zoom out to see it" : "No aurora in view. Zoom out to find the oval";
     c.font = "600 12.5px " + col("--body");
     const mw = c.measureText(msg).width, mx = clamp((W - mw) / 2, 30, W - mw - 12), my = 64;
     c.fillStyle = "rgba(6,10,19,0.75)"; c.beginPath(); c.roundRect ? c.roundRect(mx - 26, my - 16, mw + 40, 24, 12) : c.rect(mx - 26, my - 16, mw + 40, 24); c.fill();
@@ -1104,40 +1161,41 @@ function drawMap(fast) {
   const pts = new Map();
   let last = null, pinch = null, raf = 0, moved = 0;
   const redraw = (fast) => { if (fast) { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawMap(true); }); } else { cancelAnimationFrame(raf); raf = 0; drawMap(false); } };
-  const startCustom = () => { if (!MV.custom && MV.cur) { MV.custom = true; MV.lonC = MV.cur.lonC; MV.latC = MV.cur.latC; MV.zoom = MV.cur.s / MV.fit; } };
-  function paint() { $("viewScot").setAttribute("aria-pressed", String(!MV.custom)); $("viewWorld").setAttribute("aria-pressed", String(MV.custom && MV.zoom <= minZoom(cv.getBoundingClientRect().width) * 1.05)); }
-  const zoomBy = (k, ax, ay) => {
-    startCustom();
-    const W = cv.getBoundingClientRect().width, H = cv.getBoundingClientRect().height, v = MV.cur;
-    const z = clamp(MV.zoom * k, minZoom(W), 6);
-    if (ax != null && v) { // keep the point under the cursor in place
-      const lon = v.lonC + (ax - W / 2) / (v.KX * v.s), lat = v.latC - (ay - H / 2) / v.s, s2 = MV.fit * z;
-      MV.latC = clamp(lat + (ay - H / 2) / s2, -80, 85); MV.lonC = lon - (ax - W / 2) / (Math.cos(rad(clamp(MV.latC, -65, 65))) * s2);
-    }
-    MV.zoom = z; paint(); redraw(false);
+  const take = () => { // the first move takes over from the automatic view
+    const v = MV.cur; if (!v) return;
+    if (MV.mode === "globe" && !MV.g.custom) Object.assign(MV.g, { custom: true, lat: v.lat0, lon: v.lon0, R: v.R });
+    if (MV.mode === "map" && !MV.m.custom) Object.assign(MV.m, { custom: true, lonC: v.lonC, latC: v.latC, s: v.s });
   };
+  const zoom = (k) => {
+    take();
+    if (MV.mode === "globe") MV.g.R = clamp(MV.g.R * k, MV.minR || 50, (MV.fitR || 500) * 5);
+    else MV.m.s = clamp(MV.m.s * k, MV.fitS || 1, (MV.fitS || 1) * 40);
+  };
+  const pan = (dx, dy) => {
+    take();
+    if (MV.mode === "globe") { const R = MV.g.R; MV.g.lon -= dx / R * 180 / Math.PI / Math.max(0.15, Math.cos(rad(MV.g.lat))); MV.g.lat = clamp(MV.g.lat + dy / R * 180 / Math.PI, -88, 88); }
+    else { const v = MV.cur; MV.m.lonC -= dx / (v.KX * v.s); MV.m.latC = clamp(MV.m.latC + dy / v.s, -70, 80); }
+  };
+  function paint() { $("viewGlobe").setAttribute("aria-pressed", String(MV.mode === "globe")); $("viewMap").setAttribute("aria-pressed", String(MV.mode === "map")); }
   cv.addEventListener("pointerdown", (e) => {
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 1) { last = [e.clientX, e.clientY]; moved = 0; }
-    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), zoom: MV.zoom }; startCustom(); }
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); take(); }
   });
   cv.addEventListener("pointermove", (e) => {
     if (!pts.has(e.pointerId)) return;
     const prev = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 2 && pinch) {
       const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      MV.zoom = clamp(pinch.zoom * d / Math.max(10, pinch.d), minZoom(cv.getBoundingClientRect().width), 6);
-      const v = MV.cur; if (v) { MV.lonC -= (e.clientX - prev[0]) / 2 / (v.KX * v.s); MV.latC = clamp(MV.latC + (e.clientY - prev[1]) / 2 / v.s, -80, 85); }
-      MV.dragging = true; box.classList.add("dragging"); paint(); redraw(true); return;
+      zoom(d / Math.max(10, pinch)); pinch = d; pan((e.clientX - prev[0]) / 2, (e.clientY - prev[1]) / 2);
+      MV.dragging = true; box.classList.add("dragging"); redraw(true); return;
     }
     if (pts.size !== 1 || !last) return;
     const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
     moved += Math.abs(dx) + Math.abs(dy);
     if (moved < 5) return;
-    if (!MV.dragging) { startCustom(); MV.dragging = true; box.classList.add("dragging"); if (typeof hideTip === "function") hideTip(); try { cv.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
-    const v = MV.cur;
-    MV.lonC -= dx / (v.KX * v.s); MV.latC = clamp(MV.latC + dy / v.s, -80, 85);
-    paint(); redraw(true);
+    if (!MV.dragging) { MV.dragging = true; box.classList.add("dragging"); if (typeof hideTip === "function") hideTip(); try { cv.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
+    pan(dx, dy); redraw(true);
   });
   const end = (e) => {
     pts.delete(e.pointerId);
@@ -1146,11 +1204,12 @@ function drawMap(fast) {
     if (pts.size === 0) { last = null; if (MV.dragging) { MV.justDragged = true; setTimeout(() => { MV.justDragged = false; }, 50); } MV.dragging = false; box.classList.remove("dragging"); redraw(false); }
   };
   cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
-  cv.addEventListener("wheel", (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomBy(e.deltaY > 0 ? 1 / 1.15 : 1.15, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
-  $("zoomIn").addEventListener("click", () => zoomBy(1.4));
-  $("zoomOut").addEventListener("click", () => zoomBy(1 / 1.4));
-  $("viewScot").addEventListener("click", () => { MV.custom = false; paint(); redraw(false); });
-  $("viewWorld").addEventListener("click", () => { startCustom(); MV.zoom = minZoom(cv.getBoundingClientRect().width); MV.lonC = (S.here || S.townObj || { lon: 0 }).lon; MV.latC = 20; paint(); redraw(false); });
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 1 / 1.15 : 1.15); redraw(false); }, { passive: false });
+  $("zoomIn").addEventListener("click", () => { zoom(1.4); redraw(false); });
+  $("zoomOut").addEventListener("click", () => { zoom(1 / 1.4); redraw(false); });
+  $("recenter").addEventListener("click", () => { if (MV.mode === "globe") MV.g.custom = false; else MV.m.custom = false; redraw(false); });
+  $("viewGlobe").addEventListener("click", () => { MV.mode = "globe"; paint(); requestAnimationFrame(() => redraw(false)); });
+  $("viewMap").addEventListener("click", () => { MV.mode = "map"; paint(); requestAnimationFrame(() => redraw(false)); });
   paint();
 })();
 
@@ -1261,7 +1320,7 @@ function makeFlow(baseId) {
 function setFlow(f, P, W, H, pxPerDeg, global, b, inv, fast) {
   if (!f) return;
   const ref = S.here || S.townObj;
-  const view = [MV.custom, MV.lonC.toFixed(3), MV.latC.toFixed(3), MV.zoom.toFixed(4)].join(",");
+  const view = MV.mode + ":" + JSON.stringify(MV.cur || {});
   const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && ref ? ref.lat + "," + ref.lon : "", view].join("|");
   f.P = P;
   if (f.key === key) return; // same view and data (e.g. a hover redraw): keep the particles flowing
