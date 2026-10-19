@@ -190,9 +190,9 @@ select {
 /* chances above 50%: an aurora wave rolls across the digits */
 .aurora-num .wd { display: inline-block; animation: auroraDigit 1.6s ease-in-out infinite; }
 @keyframes auroraDigit {
-  0%, 100% { color: var(--dancer); text-shadow: 0 0 14px rgba(95, 240, 176, 0.65); transform: translateY(0); }
+  0%, 100% { color: var(--dancer); text-shadow: 0 0 14px rgba(95, 240, 176, 0.65); }
   25% { color: var(--teal); text-shadow: 0 0 14px rgba(60, 198, 201, 0.65); }
-  50% { color: var(--heather); text-shadow: 0 0 16px rgba(180, 140, 255, 0.75); transform: translateY(-3px); }
+  50% { color: var(--heather); text-shadow: 0 0 16px rgba(180, 140, 255, 0.75); }
   75% { color: var(--rose); text-shadow: 0 0 14px rgba(255, 127, 176, 0.65); }
 }
 @media (prefers-reduced-motion: reduce) { .aurora-num .wd { animation: none; color: var(--dancer); text-shadow: 0 0 12px rgba(95, 240, 176, 0.55); } }
