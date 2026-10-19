@@ -155,7 +155,7 @@ select {
 .minefacts dt { font: 500 11.5px/1.2 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mist); }
 .minefacts dd { margin: 0; font: 800 24px/1.1 var(--display); letter-spacing: 0.01em; }
 .minefacts dd small { font: 400 12px/1.3 var(--mono); color: var(--mist); display: block; margin-top: 3px; letter-spacing: 0; }
-.minemap { margin-bottom: 18px; }
+.minemap { margin-bottom: 0; }
 .mapbox.minemap canvas { aspect-ratio: 2.1; }
 @media (max-width: 700px) { .mapbox.minemap canvas { aspect-ratio: 1.15; } }
 .abroad { margin: 0 0 22px; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(180, 140, 255, 0.35); background: rgba(180, 140, 255, 0.08); max-width: 760px; }
@@ -326,10 +326,6 @@ footer p { margin: 0; max-width: 90ch; }
         <div class="pct minepct" id="minePct">–</div>
       </div>
       <dl class="minefacts" id="mineFacts"></dl>
-      <div class="mapbox minemap" id="mineMapBox" hidden>
-        <canvas id="mineMap" role="img" aria-label="Map around your location showing the aurora oval"></canvas>
-        <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="mineMapNote"></span></div>
-      </div>
       <div class="chart" id="mineChart"></div>
     </div>
   </section>
@@ -363,6 +359,22 @@ footer p { margin: 0; max-width: 90ch; }
         </div>
         <p class="maphint"><span class="mouse">Hover a spot for its details. Click it to find it in the list.</span><span class="touch">Tap a spot for its details. Tap it again to find it in the list.</span></p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="ovalH">
+    <div class="wrap">
+      <div class="head">
+        <div>
+          <div class="eyebrow">NOAA’s live aurora oval</div>
+          <h2 id="ovalH">Where the aurora is right now</h2>
+          <p class="lede" id="ovalLede">The aurora lives in a ring around the magnetic pole. When it swells south towards you, your chances go up.</p>
+        </div>
+      </div>
+      <div class="mapbox minemap" id="mineMapBox">
+        <canvas id="mineMap" role="img" aria-label="Globe view showing the aurora oval and your position"></canvas>
+        <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="mineMapNote"></span></div>
       </div>
     </div>
   </section>
@@ -900,8 +912,7 @@ function renderMine() {
     d.append(dt, dd); dl.append(d);
   }
   $("mineChart").innerHTML = hourChart(m, ltf, lhf);
-  $("mineMapBox").hidden = !S.abroad;
-  drawMineMap();
+
 }
 function renderWeather() {
   const now = Date.now();
@@ -956,7 +967,7 @@ function renderStatus() {
   else if (vs.includes("snapshot")) el.append("Some feeds come from a copy refreshed every 15 minutes.");
 }
 function renderAll() {
-  compute(); renderHero(); renderMine(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
+  compute(); renderHero(); renderMine(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); drawMineMap(); checkAlert();
   if (pinned) showTip(pinned, "pin"); else if (hoverId) showTip(hoverId, "hover");
 }
 
@@ -1025,22 +1036,37 @@ function drawMap() {
     if (sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
   $("ovTime").textContent = S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : (S.ov ? "" : "Estimated from Kp");
+  // when the oval sits north of the map (most quiet nights), say where it is
+  let onMap = false;
+  for (let la = Math.floor(BOX.s); la <= Math.ceil(BOX.n) && !onMap; la++) for (let lo = Math.floor(BOX.w); lo <= Math.ceil(BOX.e); lo++) if (auroraVal(lo, la, false) >= 4) { onMap = true; break; }
+  if (!onMap && (S.ov || kpNow != null)) {
+    let edge = null;
+    for (let la = Math.ceil(BOX.n); la <= 80 && edge == null; la += 0.5) for (let lo = -6; lo <= 2; lo += 2) if (auroraVal(lo, la, false) >= 4) { edge = la; break; }
+    const msg = edge == null ? "Aurora oval: far to the north tonight" : "Aurora oval: about " + Math.round((edge - 60.15) * 111 / 50) * 50 + " km north of Shetland";
+    c.font = "600 12.5px " + col("--body");
+    const mw = c.measureText(msg).width, mx = (W - mw) / 2, my = 26;
+    c.fillStyle = "rgba(6,10,19,0.72)"; c.beginPath(); c.roundRect ? c.roundRect(mx - 26, my - 16, mw + 40, 24, 12) : c.rect(mx - 26, my - 16, mw + 40, 24); c.fill();
+    c.fillStyle = col("--dancer");
+    c.beginPath(); c.moveTo(mx - 14, my - 1); c.lineTo(mx - 8, my - 9); c.lineTo(mx - 2, my - 1); c.closePath(); c.fill();
+    c.fillText(msg, mx + 4, my);
+    c.font = "10px " + col("--mono");
+  }
   setFlow(flowMain, P, W, H, s, false, { w: BOX.w - 1, e: BOX.e + 1, s: BOX.s - 1, n: BOX.n + 3 },
     (x, y) => [BOX.w + (x - ox) / (KX * s), BOX.n - (y - oy) / s]);
 }
 
 /* ---------- the visitor's own map: their coastline, their position and the live aurora oval ---------- */
 function drawMineMap() {
-  const box = $("mineMapBox");
-  if (!S.here || box.hidden) return;
+  const ref = S.here || S.townObj;
+  if (!ref) return;
   const cv = $("mineMap"), r = cv.getBoundingClientRect();
   if (!r.width) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
   const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = r.width, H = r.height, css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
-  const pole = S.here.lat < 0 ? -1 : 1;
-  const lat0 = clamp(S.here.lat + 7 * pole, -86, 86), lon0 = S.here.lon;
+  const pole = ref.lat < 0 ? -1 : 1;
+  const lat0 = clamp(ref.lat + 7 * pole, -86, 86), lon0 = ref.lon;
   const R = Math.min(W, H) / 2 / Math.sin(rad(17));
   const f0 = rad(lat0), sf0 = Math.sin(f0), cf0 = Math.cos(f0), l0 = rad(lon0);
   const P = (lon, lat) => {
@@ -1077,11 +1103,11 @@ function drawMineMap() {
     return [lon, lat];
   };
   // the visitor
-  const [ux, uy] = P(S.here.lon, S.here.lat);
+  const [ux, uy] = P(ref.lon, ref.lat);
   c.beginPath(); c.arc(ux, uy, 11, 0, Math.PI * 2); c.fillStyle = "rgba(244,184,96,0.18)"; c.fill();
   c.strokeStyle = col("--whisky"); c.lineWidth = 1.8; c.beginPath(); c.moveTo(ux - 7, uy); c.lineTo(ux + 7, uy); c.moveTo(ux, uy - 7); c.lineTo(ux, uy + 7); c.stroke();
   c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body");
-  const lab = "You" + (S.here.source === "ip" ? " (approx.)" : "");
+  const lab = S.here ? "You" + (S.here.source === "ip" ? " (approx.)" : "") : ref.name;
   c.fillText(lab, ux + 12 + c.measureText(lab).width > W - 8 ? ux - 12 - c.measureText(lab).width : ux + 12, uy + 4);
   $("mineMapNote").textContent = S.ov && S.ovFull ? (S.ovAt ? "OVATION model, " + ltf.format(S.ovAt) : "") : "Estimated from Kp";
   setFlow(flowMine, P, W, H, R * rad(1), true, null, inv);
@@ -1182,7 +1208,8 @@ function makeFlow(baseId) {
 }
 function setFlow(f, P, W, H, pxPerDeg, global, b, inv) {
   if (!f) return;
-  const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && S.here ? S.here.lat + "," + S.here.lon : ""].join("|");
+  const ref = S.here || S.townObj;
+  const key = [W, H, global, S.ovAt, S.ovFull, kpAt(Date.now()), global && ref ? ref.lat + "," + ref.lon : ""].join("|");
   f.P = P;
   if (f.key === key) return; // same view and data (e.g. a hover redraw): keep the particles flowing
   f.key = key;
