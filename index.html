@@ -146,6 +146,9 @@ select {
   background-position: calc(100% - 17px) 55%, calc(100% - 12px) 55%;
   background-size: 5px 5px; background-repeat: no-repeat;
 }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { background: transparent; border: 0; border-radius: 999px; padding: 5px 12px; font: 500 13px/1 var(--body); color: var(--mist); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--peat); color: var(--frost); box-shadow: inset 0 0 0 1px rgba(95, 240, 176, 0.35); }
 .spots { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .spot {
   width: 100%; text-align: left; cursor: pointer; background: transparent; border: 0;
@@ -309,6 +312,10 @@ footer p { margin: 0; max-width: 90ch; }
           <label for="town">I’m near</label>
           <select id="town"></select>
           <button class="btn" id="locate" type="button">Use my location</button>
+          <div class="seg" role="group" aria-label="Sort spots">
+            <button type="button" id="sortBest" aria-pressed="true">Best bet</button>
+            <button type="button" id="sortNear" aria-pressed="false">Nearest</button>
+          </div>
         </div>
       </div>
       <div class="where">
@@ -557,7 +564,7 @@ const usesConnector = () => Object.values(via).includes("connector");
 const S = {
   kp: null, bz: null, bt: null, wind: null, windAt: null, ov: null, ovAt: null, wx: null,
   status: {}, updated: null, pageErr: null,
-  town: store.get("town", "Glasgow"), here: null, sel: null, ranked: [], best: null
+  town: store.get("town", null), here: null, sel: null, ranked: [], best: null, sort: store.get("sort", "best")
 };
 
 function parseKp(j) {
@@ -655,7 +662,7 @@ const TIERS = [
 function renderHero() {
   const top = S.ranked[0];
   const town = S.townObj;
-  $("heroEyebrow").textContent = "Tonight near " + town.name;
+  $("heroEyebrow").textContent = S.here ? "Tonight near you" + (S.here.near ? " · " + S.here.near : "") : "Tonight near " + town.name;
   const any = S.kp || S.wx;
   if (!any) {
     $("verdict").textContent = "Sky unreadable";
@@ -704,7 +711,9 @@ function renderHero() {
 function renderSpots() {
   const ol = $("spots");
   ol.textContent = "";
-  S.ranked.forEach((r, k) => {
+  const bestId = S.ranked[0] && S.ranked[0].s.id;
+  const list = S.sort === "near" ? S.ranked.slice().sort((a, b) => a.dist - b.dist) : S.ranked;
+  list.forEach((r) => {
     const li = document.createElement("li");
     const b = document.createElement("button");
     b.type = "button"; b.className = "spot"; b.dataset.id = r.s.id;
@@ -715,7 +724,7 @@ function renderSpots() {
     writeChance(pct, r.best.p, true);
     const mid = document.createElement("div");
     const nm = document.createElement("div"); nm.className = "sname"; nm.textContent = r.s.name;
-    if (k === 0) { const t = document.createElement("span"); t.className = "tag pick"; t.textContent = "Your best bet"; nm.append(t); }
+    if (r.s.id === bestId) { const t = document.createElement("span"); t.className = "tag pick"; t.textContent = "Your best bet"; nm.append(t); }
     if (r.ferry) { const t = document.createElement("span"); t.className = "tag ferry"; t.textContent = "Ferry"; nm.append(t); }
     const meta = document.createElement("div"); meta.className = "smeta";
     meta.textContent = r.s.area + " · " + (r.ferry ? Math.round(r.dist) + " km + ferry" : driveText(r.mins) + " drive");
@@ -1008,23 +1017,58 @@ $("refresh").addEventListener("click", load);
 $("noticeBtn").addEventListener("click", load);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > 10 * 60000) load(); });
 
-/* ---------- where am I ---------- */
+/* ---------- where am I: the visitor's location by default, else a town they picked ---------- */
 const sel = $("town");
+{ const o = document.createElement("option"); o.value = "__here"; o.textContent = "My location"; sel.append(o); }
 for (const t of TOWNS) { const o = document.createElement("option"); o.value = t.name; o.textContent = t.name; sel.append(o); }
-if (!TOWNS.some(t => t.name === S.town)) S.town = "Glasgow";
-sel.value = S.town;
-sel.addEventListener("change", () => { S.town = sel.value; S.here = null; S.picked = false; store.set("town", S.town); renderAll(); });
-$("locate").addEventListener("click", () => {
-  if (!navigator.geolocation) { $("locate").textContent = "Location unavailable"; $("locate").disabled = true; return; }
-  $("locate").textContent = "Finding you…";
+function setHere(lat, lon) {
+  const here = { lat, lon };
+  const nearest = TOWNS.reduce((a, b) => (km(here, b) < km(here, a) ? b : a));
+  const d = km(here, nearest);
+  S.here = { name: "you", lat, lon, near: d < 40 ? nearest.name : null, group: d < 40 ? nearest.group : undefined };
+  sel.value = "__here";
+}
+function useTown(name) { S.here = null; S.town = TOWNS.some(t => t.name === name) ? name : "Glasgow"; sel.value = S.town; }
+function locate(auto) {
+  const btn = $("locate");
+  if (!navigator.geolocation) { if (!auto) { btn.textContent = "Location unavailable"; btn.disabled = true; } return; }
+  btn.textContent = "Finding you…";
   navigator.geolocation.getCurrentPosition((pos) => {
-    const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-    const nearest = TOWNS.reduce((a, b) => (km(here, b) < km(here, a) ? b : a));
-    S.here = { name: "you", lat: here.lat, lon: here.lon, group: km(here, nearest) < 40 ? nearest.group : undefined };
-    S.picked = false; $("locate").textContent = "Using your location";
+    // remembered on this device only, rounded to about 1 km
+    const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;
+    setHere(lat, lon);
+    store.set("here", { lat, lon }); store.set("town", "__here");
+    S.picked = false; btn.textContent = "Using your location";
     renderAll();
-  }, () => { $("locate").textContent = "Location blocked, pick a town"; $("locate").disabled = true; }, { timeout: 10000, maximumAge: 600000 });
+  }, () => {
+    btn.textContent = auto ? "Use my location" : "Location blocked, pick a town";
+    if (S.here) return; // keep the last known spot
+    if (sel.value === "__here") useTown("Glasgow");
+    renderAll();
+  }, { timeout: 12000, maximumAge: 15 * 60000 });
+}
+// Start: last known location (instant), then refresh it; or the town they chose; first visit asks for location.
+const savedHere = store.get("here", null), savedTown = S.town;
+if (savedTown && savedTown !== "__here") useTown(savedTown);
+else if (savedHere) setHere(savedHere.lat, savedHere.lon);
+else useTown("Glasgow");
+if (savedTown === "__here" || savedTown === null) {
+  const ask = () => locate(true);
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: "geolocation" }).then((st) => { if (st.state !== "denied") ask(); }).catch(ask);
+  } else ask();
+}
+sel.addEventListener("change", () => {
+  S.picked = false;
+  if (sel.value === "__here") { if (savedHere || S.here) setHere((S.here || savedHere).lat, (S.here || savedHere).lon); locate(false); }
+  else { useTown(sel.value); store.set("town", S.town); $("locate").textContent = "Use my location"; }
+  renderAll();
 });
+$("locate").addEventListener("click", () => locate(false));
+function paintSort() { $("sortBest").setAttribute("aria-pressed", String(S.sort !== "near")); $("sortNear").setAttribute("aria-pressed", String(S.sort === "near")); }
+$("sortBest").addEventListener("click", () => { S.sort = "best"; store.set("sort", "best"); paintSort(); renderSpots(); });
+$("sortNear").addEventListener("click", () => { S.sort = "near"; store.set("sort", "near"); paintSort(); renderSpots(); });
+paintSort();
 
 /* ---------- alerts ---------- */
 const ALERT_AT = 35;
