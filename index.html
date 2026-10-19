@@ -610,10 +610,17 @@ function renderHero() {
   const b = top.best;
   let why;
   if (b.dark === 0 && b.p === 0) why = "It’s still too light. The night’s numbers fill in after sunset.";
-  else if (b.act < 0.25) why = "The sun’s having a quiet day. Clear skies won’t help if there’s nothing to see.";
+  else if (b.act < 0.25) {
+    const kpTonight = Math.max(0, ...S.hours.map(kpAt).filter(v => v != null));
+    why = kpTonight >= 4
+      ? "There’s a minor storm tonight (Kp " + kpTonight.toFixed(1) + "), but it’s not quite strong enough to reach this far south."
+      : "The sun’s having a quiet day. Clear skies won’t help if there’s nothing to see.";
+  }
   else if (b.clear < 0.35) why = "Space weather is decent, but the clouds are winning" + (b.cc != null ? " (" + Math.round(b.cc) + "% cover at the best hour)." : ".");
   else if (b.p >= 32) why = "Activity is up and the sky looks clear enough at " + top.s.name + ". That’s the combination you want.";
   else why = "Some activity, some cloud. It could go either way, so watch the hourly chart.";
+  const far = S.ranked.reduce((x, y) => (y.best.p > x.best.p ? y : x));
+  if (far !== top && far.best.p >= 35 && far.best.p > p + 15) why += " Best in Scotland tonight: " + far.s.name + " (" + far.s.area + ") at " + far.best.p + "%.";
   $("why").textContent = why;
 
   $("fBest").innerHTML = "";
