@@ -100,7 +100,7 @@ h2 {
 .hero video.sky-video {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2;
   opacity: 0; transition: opacity 1.6s ease, filter 2.5s ease;
-  filter: saturate(calc(0.35 + 0.85 * var(--glow))) brightness(calc(0.5 + 0.5 * var(--glow)));
+  filter: saturate(calc(0.8 + 0.45 * var(--glow))) brightness(calc(0.82 + 0.23 * var(--glow)));
 }
 .hero video.sky-video.on { opacity: 1; }
 .hero.cine { min-height: min(88svh, 860px); display: flex; flex-direction: column; justify-content: flex-end; }
@@ -916,8 +916,9 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
   const tall = window.innerHeight > window.innerWidth * 1.1;
   const px = Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1);
   const pick = tall
-    ? { src: "media/hero-tall.mp4", poster: "media/hero-tall.jpg", credit: "Footage: northern lights over Lofoten, Norway, by Alari Tammsalu (Pexels). Not a live view. Its brightness follows tonight’s forecast." }
-    : { src: px >= 2200 ? "media/hero-wide-1440.mp4" : "media/hero-wide-1080.mp4", poster: "media/hero-wide.jpg", credit: "Footage: northern lights over Iceland, by Ken Cheung (Pexels). Not a live view. Its brightness follows tonight’s forecast." };
+    ? { src: "media/hero-tall.mp4", poster: "media/hero-tall.jpg" }
+    : { src: px >= 2200 ? "media/hero-wide-1440.mp4" : "media/hero-wide-1080.mp4", poster: "media/hero-wide.jpg" };
+  pick.credit = "Footage: northern lights over Finland, by T Honkamies (Pexels). Not a live view. It glows brighter on better nights.";
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let shown = false;
   function show() {

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Prepares the hero footage: downloads two free Pexels aurora timelapses once,
-# makes each loop smoothly (plays forward then backward) and compresses it for the web.
-# Pexels licence: free to use and modify, no attribution required (we credit anyway).
+# Prepares the hero footage: downloads a free Pexels aurora timelapse once, makes it
+# loop seamlessly (the last 1.5 s cross-fades into the start) and compresses it for the web:
+# 1440p and 1080p landscape for computers, and a portrait crop for phones.
+# Footage: "Northern lights timelapse" by T Honkamies, Finland (Pexels licence: free to use
+# and modify, no attribution required; we credit anyway).
 # Usage: scripts/hero-media.sh <out-dir>. Never fails the deploy: without footage
 # the page keeps its animated canvas sky.
 set -uo pipefail
@@ -11,40 +13,38 @@ if [ -s "$out/hero-wide-1080.mp4" ] && [ -s "$out/hero-tall.mp4" ]; then
   echo "hero footage already prepared"; exit 0
 fi
 
-WIDE_URL="https://videos.pexels.com/video-files/35092214/14866548_2560_1440_25fps.mp4"   # Ken Cheung, Iceland
-TALL_URL="https://videos.pexels.com/video-files/35206733/14915390_1440_2560_24fps.mp4"   # Alari Tammsalu, Lofoten
+SRC_URL="https://videos.pexels.com/video-files/28492331/12397893_2560_1440_24fps.mp4"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+FADE=1.5
 
 if ! command -v ffmpeg >/dev/null; then
   sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null || { echo "ffmpeg unavailable, skipping footage"; exit 0; }
 fi
 
 tmp="$(mktemp -d)"
-get() { curl -fsSL --retry 3 -A "$UA" -e "https://www.pexels.com/" -o "$2" "$1"; }
+if ! curl -fsSL --retry 3 -A "$UA" -e "https://www.pexels.com/" -o "$tmp/src.mp4" "$SRC_URL"; then
+  echo "footage download failed"; rm -rf "$tmp"; exit 0
+fi
+dur="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$tmp/src.mp4")"
+offset="$(awk -v d="$dur" -v f="$FADE" 'BEGIN { printf "%.3f", d - 2 * f }')"
 
-# Forward then reversed, so the loop has no jump. Web-friendly H.264, no audio.
-encode() { # in, out, scale filter, crf
-  ffmpeg -loglevel error -y -i "$1" -an \
-    -filter_complex "[0:v]$3,fps=25,format=yuv420p,split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[v]" \
-    -map "[v]" -c:v libx264 -preset slow -crf "$4" -profile:v high -movflags +faststart "$2"
+# Seamless loop: play from FADE to the end, cross-fading the last FADE seconds into the
+# first FADE seconds, so the final frame matches the first. No audio, web-friendly H.264.
+encode() { # out, extra filters, crf
+  ffmpeg -loglevel error -y -i "$tmp/src.mp4" -an -filter_complex \
+    "[0:v]$2,fps=24,format=yuv420p,split[a][b];[a]trim=start=$FADE,setpts=PTS-STARTPTS[main];[b]trim=end=$FADE,setpts=PTS-STARTPTS[head];[main][head]xfade=transition=fade:duration=$FADE:offset=$offset,format=yuv420p[v]" \
+    -map "[v]" -c:v libx264 -preset slow -crf "$3" -profile:v high -movflags +faststart "$1"
 }
 
-if get "$WIDE_URL" "$tmp/wide.mp4"; then
-  encode "$tmp/wide.mp4" "$out/hero-wide-1440.mp4" "scale=2560:-2" 25 &&
-  encode "$tmp/wide.mp4" "$out/hero-wide-1080.mp4" "scale=1920:-2" 26 &&
-  ffmpeg -loglevel error -y -i "$out/hero-wide-1080.mp4" -frames:v 1 -q:v 4 "$out/hero-wide.jpg" ||
-  echo "wide footage failed to encode"
-else
-  echo "wide footage download failed"
-fi
+encode "$out/hero-wide-1440.mp4" "scale=2560:-2" 26 &&
+encode "$out/hero-wide-1080.mp4" "scale=1920:-2" 26 &&
+ffmpeg -loglevel error -y -i "$out/hero-wide-1080.mp4" -frames:v 1 -q:v 4 "$out/hero-wide.jpg" ||
+echo "landscape footage failed to encode"
 
-if get "$TALL_URL" "$tmp/tall.mp4"; then
-  encode "$tmp/tall.mp4" "$out/hero-tall.mp4" "scale=1080:-2" 27 &&
-  ffmpeg -loglevel error -y -i "$out/hero-tall.mp4" -frames:v 1 -q:v 4 "$out/hero-tall.jpg" ||
-  echo "tall footage failed to encode"
-else
-  echo "tall footage download failed"
-fi
+# Portrait crop for phones, centred a little right of middle where the curtains are brightest.
+encode "$out/hero-tall.mp4" "crop=ih*9/16:ih:min(iw-ih*9/16\,iw*0.56-ih*9/32):0,scale=720:1280" 26 &&
+ffmpeg -loglevel error -y -i "$out/hero-tall.mp4" -frames:v 1 -q:v 4 "$out/hero-tall.jpg" ||
+echo "portrait footage failed to encode"
 
 rm -rf "$tmp"
 ls -la "$out"
