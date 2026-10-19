@@ -842,12 +842,14 @@ function renderMine() {
   if (!m) return;
   const lat = S.here.lat, lon = S.here.lon;
   const coords = Math.abs(lat).toFixed(1) + "°" + (lat >= 0 ? "N" : "S") + ", " + Math.abs(lon).toFixed(1) + "°" + (lon >= 0 ? "E" : "W");
-  $("mineWhere").textContent = S.here.near ? "near " + S.here.near : coords;
+  const place = S.here.near ? "near " + S.here.near : S.here.city || coords;
+  $("mineWhere").textContent = place + (S.here.source === "ip" ? " (approximate)" : S.here.source === "link" ? " (from the link)" : "");
   const tzNote = LOCAL_TZ !== "Europe/London" ? " Times are in your time zone." : "";
   $("mineLede").textContent = (m.south
     ? "You’re in the southern hemisphere, so you’re looking for the aurora australis, low over the southern horizon."
     : "The aurora shows up low over your northern horizon first.") +
-    " This assumes a little light pollution: getting away from street lights helps." + tzNote;
+    " This assumes a little light pollution: getting away from street lights helps." + tzNote +
+    (S.here.source === "ip" ? " Your location is a rough guess from your internet connection. Tap “Use exact location” for a precise one." : "");
   writeChance($("minePct"), m.best.p, true);
   $("minePct").style.color = chanceColor(m.best.p);
   const kpT = S.hours.map(kpAt).filter(v => v != null), kpMax = kpT.length ? Math.max(...kpT) : null;
@@ -1126,13 +1128,15 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && S.
 const sel = $("town");
 { const o = document.createElement("option"); o.value = "__here"; o.textContent = "My location"; sel.append(o); }
 for (const t of TOWNS) { const o = document.createElement("option"); o.value = t.name; o.textContent = t.name; sel.append(o); }
-function setHere(lat, lon) {
+// source: "gps" (the browser's exact location), "ip" (approximate, from the internet connection) or "link" (?lat=&lon= in the address)
+function setHere(lat, lon, source, city) {
   const here = { lat, lon };
   const nearest = TOWNS.reduce((a, b) => (km(here, b) < km(here, a) ? b : a));
   const d = km(here, nearest);
-  S.here = { name: "you", lat, lon, near: d < 40 ? nearest.name : null, group: d < 40 ? nearest.group : undefined };
+  S.here = { name: "you", lat, lon, source: source || "gps", city: city || null, near: d < 40 ? nearest.name : null, group: d < 40 ? nearest.group : undefined };
   sel.value = "__here";
 }
+const round2 = (v) => Math.round(v * 100) / 100;
 function useTown(name) { S.here = null; S.town = TOWNS.some(t => t.name === name) ? name : "Glasgow"; sel.value = S.town; }
 function locate(auto) {
   const btn = $("locate");
@@ -1140,32 +1144,59 @@ function locate(auto) {
   btn.textContent = "Finding you…";
   navigator.geolocation.getCurrentPosition((pos) => {
     // remembered on this device only, rounded to about 1 km
-    const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;
-    setHere(lat, lon);
+    const lat = round2(pos.coords.latitude), lon = round2(pos.coords.longitude);
+    setHere(lat, lon, "gps");
     store.set("here", { lat, lon }); store.set("town", "__here");
     S.picked = false; btn.textContent = "Using your location";
     renderAll(); loadMine();
   }, () => {
-    btn.textContent = auto ? "Use my location" : "Location blocked, pick a town";
-    if (S.here) return; // keep the last known spot
+    btn.textContent = auto ? (S.here && S.here.source === "ip" ? "Use exact location" : "Use my location") : "Location blocked, pick a town";
+    if (S.here) return; // keep the last known or approximate spot
     if (sel.value === "__here") useTown("Glasgow");
     renderAll();
   }, { timeout: 12000, maximumAge: 15 * 60000 });
 }
-// Start: last known location (instant), then refresh it; or the town they chose; first visit asks for location.
+/* approximate location from the internet connection (so a VPN changes it), used until or unless the
+   browser gives an exact one. Direct requests only: a relay would report its own server's location. */
+async function locateByIP() {
+  for (const u of ["https://get.geojs.io/v1/ip/geo.json", "https://ipapi.co/json/"]) {
+    try {
+      const r = await fetch(u, { cache: "no-store" });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const lat = parseFloat(j.latitude), lon = parseFloat(j.longitude);
+      if (!isFinite(lat) || !isFinite(lon)) continue;
+      if (S.here && S.here.source !== "ip") return; // an exact fix arrived first
+      setHere(round2(lat), round2(lon), "ip", j.city || null);
+      S.picked = false;
+      if ($("locate").textContent === "Use my location") $("locate").textContent = "Use exact location";
+      renderAll(); loadMine();
+      return;
+    } catch (e) { /* try the next service */ }
+  }
+}
+// Start, in order: a test link (?lat=..&lon=..), the town they chose, their last exact location, else Glasgow
+// while we ask the browser and look up an approximate location in parallel.
 const savedHere = store.get("here", null), savedTown = S.town;
-if (savedTown && savedTown !== "__here") useTown(savedTown);
-else if (savedHere) setHere(savedHere.lat, savedHere.lon);
-else useTown("Glasgow");
-if (savedTown === "__here" || savedTown === null) {
-  const ask = () => locate(true);
-  if (navigator.permissions && navigator.permissions.query) {
-    navigator.permissions.query({ name: "geolocation" }).then((st) => { if (st.state !== "denied") ask(); }).catch(ask);
-  } else ask();
+const qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
+const linkLat = parseFloat(qs.get("lat")), linkLon = parseFloat(qs.get("lon"));
+if (isFinite(linkLat) && isFinite(linkLon) && Math.abs(linkLat) <= 90 && Math.abs(linkLon) <= 180) {
+  setHere(round2(linkLat), round2(linkLon), "link");
+} else {
+  if (savedTown && savedTown !== "__here") useTown(savedTown);
+  else if (savedHere) setHere(savedHere.lat, savedHere.lon, "gps");
+  else useTown("Glasgow");
+  if (savedTown === "__here" || savedTown === null) {
+    const ask = () => locate(true);
+    if (!savedHere) locateByIP();
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "geolocation" }).then((st) => { if (st.state !== "denied") ask(); }).catch(ask);
+    } else ask();
+  }
 }
 sel.addEventListener("change", () => {
   S.picked = false;
-  if (sel.value === "__here") { if (savedHere || S.here) setHere((S.here || savedHere).lat, (S.here || savedHere).lon); locate(false); }
+  if (sel.value === "__here") { if (S.here || savedHere) { const h = S.here || savedHere; setHere(h.lat, h.lon, h.source || "gps", h.city); } else locateByIP(); locate(false); }
   else { useTown(sel.value); store.set("town", S.town); $("locate").textContent = "Use my location"; }
   renderAll();
 });
