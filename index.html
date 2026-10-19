@@ -627,6 +627,27 @@ function parseOv(j) {
   }
   return grid;
 }
+/* light 3×3 blur of the 1° grid (wraps around in longitude), so drawings don't show cell edges */
+function smoothOv(g) {
+  const out = new Float32Array(g.length), k = [1, 2, 1];
+  for (let lo = 0; lo < 360; lo++) for (let la = 0; la <= 180; la++) {
+    let sum = 0, wsum = 0;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const L = la + j; if (L < 0 || L > 180) continue;
+      const w = k[i + 1] * k[j + 1]; sum += w * g[((lo + i + 360) % 360) * 181 + L]; wsum += w;
+    }
+    out[lo * 181 + la] = sum / wsum;
+  }
+  return out;
+}
+/* bilinear sample of the softened grid: smooth between grid points */
+function ovSmooth(lon, lat) {
+  const g = S.ovS || S.ov;
+  if (!g) return 0;
+  const x = ((lon % 360) + 360) % 360, y = clamp(lat + 90, 0, 180);
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, x1 = (x0 + 1) % 360, y1 = Math.min(180, y0 + 1);
+  return (g[x0 * 181 + y0] * (1 - fx) + g[x1 * 181 + y0] * fx) * (1 - fy) + (g[x0 * 181 + y1] * (1 - fx) + g[x1 * 181 + y1] * fx) * fy;
+}
 function ovAt(lon, lat) {
   if (!S.ov) return null;
   const lo = ((Math.round(lon) % 360) + 360) % 360, la = clamp(Math.round(lat) + 90, 0, 180);
@@ -957,21 +978,9 @@ function drawMap() {
   const css = getComputedStyle(document.documentElement);
   const col = (n) => css.getPropertyValue(n).trim();
 
-  // aurora oval glow from OVATION (or a Kp-based stand-in)
-  const gw = 16, gh = 10, off = document.createElement("canvas"); off.width = gw; off.height = gh;
-  const oc = off.getContext("2d"), img = oc.createImageData(gw, gh);
+  // aurora oval glow from OVATION (or a Kp-based stand-in), drawn smoothly per pixel
   const kpNow = kpAt(Date.now());
-  for (let gx = 0; gx < gw; gx++) for (let gy = 0; gy < gh; gy++) {
-    const lon = BOX.w - 1 + gx * (BOX.e - BOX.w + 2) / (gw - 1), lat = BOX.n + 1 - gy * (BOX.n - BOX.s + 2) / (gh - 1);
-    let v = S.ov ? ovAt(lon, lat) : (kpNow == null ? 0 : 40 * sig((lat - (63.5 - 1.6 * kpNow)) * 1.2));
-    const a = clamp(v / 35);
-    const o = (gy * gw + gx) * 4;
-    img.data[o] = 95 + a * 85; img.data[o + 1] = 240 - a * 100; img.data[o + 2] = 176 + a * 79; img.data[o + 3] = Math.round(a * 150);
-  }
-  oc.putImageData(img, 0, 0);
-  const [ax, ay] = P(BOX.w - 1, BOX.n + 1), [bx, by] = P(BOX.e + 1, BOX.s - 1);
-  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
-  c.drawImage(off, ax, ay, bx - ax, by - ay);
+  paintGlow(c, W, H, (x, y) => [BOX.w + (x - ox) / (KX * s), BOX.n - (y - oy) / s], false, (a) => a * 0.6);
 
   // land
   c.beginPath();
@@ -1057,24 +1066,16 @@ function drawMineMap() {
   c.setLineDash([]);
   // aurora oval: NOAA's OVATION model, or a stand-in from Kp and magnetic latitude
   const kpNow = kpAt(Date.now());
-  // paint the oval onto a small offscreen canvas, then scale it up smoothly for a soft glow
-  const q = 6, ow = Math.ceil(W / q), oh = Math.ceil(H / q), off = document.createElement("canvas");
-  off.width = ow; off.height = oh;
-  const oc = off.getContext("2d"), cell = Math.max(1, R * rad(1.15) / q);
-  for (let la = -89; la <= 89; la++) for (let lo = -180; lo < 180; lo++) {
-    const [x, y, fr] = P(lo, la);
-    if (fr < 0.2 || x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
-    let v;
-    if (S.ov && S.ovFull) v = ovAt(lo, la);
-    else { if (kpNow == null) continue; const m = Math.abs(magLat(la, lo)); v = 40 * sig((m - (66.5 - 2.04 * kpNow)) * 1.2) * sig((75 + 0.5 * kpNow - m) * 0.8); }
-    if (v < 3) continue;
-    const a = clamp(v / 35);
-    oc.fillStyle = "rgba(" + Math.round(95 + a * 85) + "," + Math.round(240 - a * 100) + "," + Math.round(176 + a * 79) + "," + (0.06 + 0.26 * a).toFixed(2) + ")";
-    oc.fillRect(x / q - cell / 2, y / q - cell / 2, cell, cell);
-  }
-  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+  // aurora oval, worked out per pixel through the inverse of the globe projection
   c.globalCompositeOperation = "screen";
-  c.drawImage(off, 0, 0, ow * q, oh * q);
+  paintGlow(c, W, H, (x, y) => {
+    const X = (x - W / 2) / R, Y = (H / 2 - y) / R, rho = Math.hypot(X, Y);
+    if (rho >= 1) return null;
+    const cc = Math.asin(rho), sc = Math.sin(cc), ccos = Math.cos(cc);
+    const lat = rho < 1e-9 ? lat0 : Math.asin(ccos * sf0 + Y * sc * cf0 / rho) * 180 / Math.PI;
+    const lon = lon0 + Math.atan2(X * sc, rho * ccos * cf0 - Y * sc * sf0) * 180 / Math.PI;
+    return [lon, lat];
+  }, true, (a) => 0.06 + 0.3 * a);
   c.globalCompositeOperation = "source-over";
   // the visitor
   const [ux, uy] = P(S.here.lon, S.here.lat);
@@ -1087,11 +1088,32 @@ function drawMineMap() {
   setFlow(flowMine, P, W, H, R * rad(1), true, null);
 }
 
+/* soft glow: work out the aurora value for every pixel of a quarter-size canvas, then scale it up with a light blur */
+function paintGlow(c, W, H, inv, global, alpha) {
+  const q = 4, ow = Math.ceil(W / q), oh = Math.ceil(H / q), off = document.createElement("canvas");
+  off.width = ow; off.height = oh;
+  const oc = off.getContext("2d"), img = oc.createImageData(ow, oh), d = img.data;
+  for (let py = 0; py < oh; py++) for (let px = 0; px < ow; px++) {
+    const ll = inv(px * q + q / 2, py * q + q / 2);
+    if (!ll) continue;
+    const a = clamp(auroraVal(ll[0], ll[1], global) / 35);
+    if (a < 0.02) continue;
+    const o = (py * ow + px) * 4;
+    d[o] = 95 + a * 85; d[o + 1] = 240 - a * 100; d[o + 2] = 176 + a * 79; d[o + 3] = Math.round(alpha(a) * 255);
+  }
+  oc.putImageData(img, 0, 0);
+  c.save();
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+  if ("filter" in c) c.filter = "blur(" + Math.round(q * 1.5) + "px)";
+  c.drawImage(off, 0, 0, ow * q, oh * q);
+  c.restore();
+}
+
 /* ---------- flowing aurora: a particle flow field over the oval (the technique behind animated wind maps) ----------
    Particles are born where the oval is active, drift along it (along lines of constant magnetic latitude,
    westward), move faster and glow brighter where activity is stronger, and leave trails that fade. */
 function auroraVal(lon, lat, global) {
-  if (S.ov && (!global || S.ovFull)) return ovAt(lon, lat);
+  if (S.ov && (!global || S.ovFull)) return ovSmooth(lon, lat);
   const kp = kpAt(Date.now());
   if (kp == null) return 0;
   if (!global) return 40 * sig((lat - (63.5 - 1.6 * kp)) * 1.2);
@@ -1160,7 +1182,7 @@ function flowFrame() {
     c.globalCompositeOperation = "lighter"; c.lineWidth = 1.3; c.lineCap = "round";
     for (let i = 0; i < f.parts.length; i++) {
       const p = f.parts[i];
-      const v = clamp(auroraVal(Math.round(p.lon), Math.round(p.lat), f.global) / 35);
+      const v = clamp(auroraVal(p.lon, p.lat, f.global) / 35);
       const [x0, y0] = f.P(p.lon, p.lat);
       const [dx, dy] = flowDir(p.lon, p.lat);
       const step = (0.7 + 2.2 * v) / f.pxPerDeg;
@@ -1272,7 +1294,7 @@ async function load() {
     mag: async () => { const j = await getJSON("mag"); const r = Array.isArray(j) ? j[0] : j; S.bz = Math.round(parseFloat(r.bz_gsm ?? r.Bz) * 10) / 10; S.bt = parseFloat(r.bt ?? r.Bt); if (!isFinite(S.bz)) S.bz = null; },
     wind: async () => { const j = await getJSON("wind"); const r = Array.isArray(j) ? j[0] : j; S.wind = parseFloat(r.proton_speed ?? r.WindSpeed); if (!isFinite(S.wind)) S.wind = null; },
     wx: async () => { const j = await getJSON("wx"); const arr = Array.isArray(j) ? j : [j]; S.wx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
-    ov: async () => { const j = await getJSON("ov"); S.ov = parseOv(j); S.ovFull = (j.coordinates || []).length > 30000; /* the site's backup copy only covers Scotland */ S.ovAt = Date.parse(j["Forecast Time"] || j["Observation Time"]) || null; }
+    ov: async () => { const j = await getJSON("ov"); S.ov = parseOv(j); S.ovS = smoothOv(S.ov); S.ovFull = (j.coordinates || []).length > 30000; /* the site's backup copy only covers Scotland */ S.ovAt = Date.parse(j["Forecast Time"] || j["Observation Time"]) || null; }
   };
   const errs = {};
   const run = async (k) => { try { await jobs[k](); S.status[k] = "ok"; } catch (e) { S.status[k] = "fail"; errs[k] = e; } };
