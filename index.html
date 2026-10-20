@@ -179,7 +179,8 @@ select {
 .youpin.town .dot::before { background: rgba(142, 142, 147, 0.28); }
 .youpin.flip span { left: auto; right: 11px; }
 /* preview layout: the map and list live in a glass panel inside the hero, over the video */
-.heroplan { padding: 18px; border-radius: 22px; background: rgba(6, 10, 19, 0.56); -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15); border: 1px solid rgba(233, 238, 246, 0.1); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); min-width: 0; }
+.heroplan { padding: 18px; border-radius: 22px; background: rgba(6, 10, 19, 0.56); -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15); border: 1px solid rgba(233, 238, 246, 0.1); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); min-width: 0; transition: background-color 0.3s ease; }
+body.map-live .heroplan { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(6, 10, 19, 0.86); transition: none; }
 .herolayout .hero .wrap { padding-block: 36px 48px; gap: 20px; }
 .herolayout .hero.cine { min-height: 0; }
 .herolayout .verdict { font-size: clamp(44px, 7vw, 100px); max-width: none; }
@@ -218,7 +219,7 @@ select {
 .legend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 400 11px/1.3 var(--mono); color: var(--mist); pointer-events: none; }
 .mapbox canvas { touch-action: manipulation; }
 .mapbox canvas.flow, .mapbox canvas.precip { position: absolute; left: 0; top: 0; width: auto; aspect-ratio: auto; pointer-events: none; }
-.mapbox canvas.precip { mix-blend-mode: screen; }
+.mapbox canvas.precip { opacity: 0.95; }
 /* details card, docked in the map's corner so it never covers the spots around the one you picked */
 .tip {
   position: absolute; z-index: 4; left: 10px; bottom: 34px; width: min(330px, calc(100% - 20px));
@@ -1073,10 +1074,16 @@ const land = LAND.split(";").map(r => { const v = r.split(",").map(Number), pts 
 const world = WORLD.split(";").map(r => { const v = r.split(",").map(Number), pts = []; let x = 0, y = 0; for (let i = 0; i < v.length; i += 2) { x += v[i]; y += v[i + 1]; pts.push([x / 10, y / 10]); } return pts; });
 const BOX = { w: -9.4, e: 1.6, s: 54.55, n: 61.0 };
 const KX = Math.cos(rad(57.7));
+/* CSS colour tokens, read once (they never change at runtime) */
+const TOKENS = {};
+const token = (n) => TOKENS[n] || (TOKENS[n] = getComputedStyle(document.documentElement).getPropertyValue(n).trim());
 /* one map, two ways to look at it:
    Globe: a 3D globe that opens zoomed in on you (or Scotland) and pulls back to the whole planet;
    Map: a flat map of the whole world. Both can be dragged and zoomed. */
 const MV = { mode: "globe", g: { custom: false, lat: 0, lon: 0, R: 0 }, m: { custom: false, lonC: 0, latC: 15, s: 1 }, dragging: false, justDragged: false };
+// While the map moves, the hero's frosted panel swaps its blur for a plain tint and the canvas sky holds still:
+// re-blurring the backdrop behind a moving map on every frame is what made it stutter there.
+function mapLive(on) { if (MV.moving === on) return; MV.moving = on; document.body.classList.toggle("map-live", on); }
 const DETAIL = { w: -10.5, e: 3.5, s: 53.6, n: 61.4 }; // where the detailed Scotland coastline applies
 const wrapLon = (d) => ((d % 360) + 540) % 360 - 180;
 function drawMap(fast) {
@@ -1088,13 +1095,21 @@ function drawMap(fast) {
   if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
   const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = r.width, H = r.height;
-  const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
+  const col = token;
   const kpNow = kpAt(Date.now());
   const abroadRef = S.abroad && S.here ? S.here : null;
   let P, inv, pxPerDeg, bounds = null, local = false;
   c.clearRect(0, 0, W, H);
 
-  const drawRing = (ring, proj, guard) => { let prev = null; ring.forEach(([lon, lat], i) => { const [x, y] = proj(lon, lat); if (!i || (guard && Math.abs(lon - prev) > 180)) c.moveTo(x, y); else c.lineTo(x, y); prev = lon; }); };
+  const drawRing = (ring, proj, guard) => {
+    let prev = null, lx = 0, ly = 0;
+    for (let i = 0, n = ring.length; i < n; i++) {
+      const lon = ring[i][0], lat = ring[i][1], q = proj(lon, lat), x = q[0], y = q[1];
+      if (!i || (guard && Math.abs(lon - prev) > 180)) { c.moveTo(x, y); lx = x; ly = y; }
+      else if (i === n - 1 || (x - lx) * (x - lx) + (y - ly) * (y - ly) > 0.8) { c.lineTo(x, y); lx = x; ly = y; } // sub-pixel steps add nothing
+      prev = lon;
+    }
+  };
   const fillLand = (alpha, line) => { c.fillStyle = col("--peat"); c.globalAlpha = alpha; c.fill("evenodd"); c.globalAlpha = 1; c.strokeStyle = "rgba(233,238,246," + line + ")"; c.lineWidth = 0.75; c.stroke(); };
 
   if (MV.mode === "globe") {
@@ -1133,8 +1148,19 @@ function drawMap(fast) {
     // graticule
     const degPer100 = 100 / pxPerDeg, step = [1, 2, 5, 10, 15, 30].find((d) => d >= degPer100 * 0.8) || 30;
     c.save(); c.setLineDash([3, 5]); c.strokeStyle = "rgba(233,238,246,0.07)"; c.lineWidth = 1;
-    if (step >= 5) for (let lo = -180; lo < 180; lo += step) { c.beginPath(); let on = false; for (let la = -88; la <= 88; la += 2) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } c.stroke(); }
-    for (let la = -80; la <= 80; la += Math.max(step, 1)) { c.beginPath(); let on = false; for (let lo = -180; lo <= 180; lo += Math.max(1, step / 5)) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } c.stroke(); }
+    // what part of the Earth can be on screen: sample the edges (the whole globe once its edge is in view)
+    let vLat0 = -89, vLat1 = 89, vLonHalf = 180;
+    const corners = [[0, 0], [W / 2, 0], [W, 0], [W, H / 2], [W, H], [W / 2, H], [0, H], [0, H / 2]].map(([x, y]) => inv(x, y));
+    if (corners.every(Boolean)) {
+      const lats = corners.map(q => q[1]);
+      vLat0 = Math.max(-89, Math.min(...lats) - step); vLat1 = Math.min(89, Math.max(...lats) + step);
+      if (vLat1 < 85 && vLat0 > -85) vLonHalf = Math.min(180, Math.max(...corners.map(q => Math.abs(wrapLon(q[0] - lon0)))) + step);
+    }
+    const lonFrom = lon0 - vLonHalf, lonTo = lon0 + vLonHalf, seg = Math.max(0.5, Math.min(4, step / 4));
+    c.beginPath();
+    if (step >= 5) for (let lo = Math.ceil(lonFrom / step) * step; lo < lonTo; lo += step) { let on = false; for (let la = Math.max(-88, vLat0); la <= Math.min(88, vLat1); la += seg) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } }
+    for (let la = Math.ceil(Math.max(-80, vLat0) / step) * step; la <= Math.min(80, vLat1); la += step) { let on = false; for (let lo = lonFrom; lo <= lonTo; lo += seg) { const [x, y, fr] = P(lo, la); if (fr < 0.02) { on = false; continue; } on ? c.lineTo(x, y) : c.moveTo(x, y); on = true; } }
+    c.stroke();
     c.restore();
     // land: the world outline, with the detailed Scotland coastline taking over where it applies
     const edge = [];
@@ -1285,6 +1311,7 @@ function flyTo(place, wide) {
   const step = (now) => {
     const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     set(e);
+    mapLive(k < 1);
     if (k < 1) { drawMap(true); flight = requestAnimationFrame(step); } else drawMap(false);
   };
   flight = requestAnimationFrame(step);
@@ -1292,8 +1319,21 @@ function flyTo(place, wide) {
 (function mapControls() {
   const cv = $("map"), box = $("mapbox");
   const pts = new Map();
-  let last = null, pinch = null, raf = 0, moved = 0;
-  const redraw = (fast) => { if (fast) { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawMap(true); }); } else { cancelAnimationFrame(raf); raf = 0; drawMap(false); } };
+  let last = null, pinch = null, moved = 0, raf = 0, settleT = 0;
+  let zoomGoal = 1, vel = [0, 0], track = [];
+  // every change goes through one loop: at most one quick frame per screen refresh, then one full-quality frame when it all stops
+  function frame() {
+    raf = 0;
+    let busy = false;
+    if (Math.abs(Math.log(zoomGoal)) > 0.002) { const k = Math.pow(zoomGoal, 0.28); zoom(k); zoomGoal /= k; busy = true; } else zoomGoal = 1;
+    if (!MV.dragging && (Math.abs(vel[0]) > 0.05 || Math.abs(vel[1]) > 0.05)) { pan(vel[0] * 16, vel[1] * 16); vel = [vel[0] * 0.9, vel[1] * 0.9]; busy = true; } else if (!MV.dragging) vel = [0, 0];
+    mapLive(true);
+    drawMap(true);
+    if (busy || MV.dragging) { if (busy) kick(); }
+    clearTimeout(settleT);
+    settleT = setTimeout(() => { if (!MV.dragging && zoomGoal === 1 && !vel[0] && !vel[1]) { mapLive(false); drawMap(false); } }, 140);
+  }
+  const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   const take = () => { // the first move takes over from the automatic view
     cancelAnimationFrame(flight);
     const v = MV.cur; if (!v) return;
@@ -1310,9 +1350,11 @@ function flyTo(place, wide) {
     if (MV.mode === "globe") { const R = MV.g.R; MV.g.lon -= dx / R * 180 / Math.PI / Math.max(0.15, Math.cos(rad(MV.g.lat))); MV.g.lat = clamp(MV.g.lat + dy / R * 180 / Math.PI, -88, 88); }
     else { const v = MV.cur; MV.m.lonC -= dx / (v.KX * v.s); MV.m.latC = clamp(MV.m.latC + dy / v.s, -70, 80); }
   };
+  const zoomSmooth = (k) => { take(); zoomGoal *= k; vel = [0, 0]; kick(); };
   function paint() { $("viewGlobe").setAttribute("aria-pressed", String(MV.mode === "globe")); $("viewMap").setAttribute("aria-pressed", String(MV.mode === "map")); }
   cv.addEventListener("pointerdown", (e) => {
     pts.set(e.pointerId, [e.clientX, e.clientY]);
+    vel = [0, 0]; zoomGoal = 1; track = [];
     if (pts.size === 1) { last = [e.clientX, e.clientY]; moved = 0; }
     if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); take(); }
   });
@@ -1322,28 +1364,45 @@ function flyTo(place, wide) {
     if (pts.size === 2 && pinch) {
       const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
       zoom(d / Math.max(10, pinch)); pinch = d; pan((e.clientX - prev[0]) / 2, (e.clientY - prev[1]) / 2);
-      MV.dragging = true; box.classList.add("dragging"); redraw(true); return;
+      MV.dragging = true; box.classList.add("dragging"); kick(); return;
     }
     if (pts.size !== 1 || !last) return;
     const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
     moved += Math.abs(dx) + Math.abs(dy);
     if (moved < 5) return;
-    if (!MV.dragging) { MV.dragging = true; box.classList.add("dragging"); if (typeof hideTip === "function") hideTip(); try { cv.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
-    pan(dx, dy); redraw(true);
+    if (!MV.dragging) { MV.dragging = true; box.classList.add("dragging"); if (typeof hideTip === "function") $("chip").hidden = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
+    pan(dx, dy);
+    const t = performance.now(); track.push([t, dx, dy]); while (track.length && t - track[0][0] > 90) track.shift();
+    kick();
   });
   const end = (e) => {
     pts.delete(e.pointerId);
     if (pts.size < 2) pinch = null;
     if (pts.size === 1) last = [...pts.values()][0];
-    if (pts.size === 0) { last = null; if (MV.dragging) { MV.justDragged = true; setTimeout(() => { MV.justDragged = false; }, 50); } MV.dragging = false; box.classList.remove("dragging"); redraw(false); }
+    if (pts.size === 0) {
+      last = null;
+      if (MV.dragging) {
+        MV.justDragged = true; setTimeout(() => { MV.justDragged = false; }, 50);
+        // momentum: keep gliding at the speed of the last ~90 ms of the drag
+        const span = track.length > 1 ? track[track.length - 1][0] - track[0][0] : 0;
+        if (span > 0 && !REDUCE_MOTION) { const sx = track.reduce((a, q) => a + q[1], 0), sy = track.reduce((a, q) => a + q[2], 0); vel = [sx / span, sy / span]; }
+      }
+      MV.dragging = false; box.classList.remove("dragging"); kick();
+    }
   };
   cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
-  cv.addEventListener("wheel", (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 1 / 1.15 : 1.15); redraw(false); }, { passive: false });
-  $("zoomIn").addEventListener("click", () => { zoom(1.4); redraw(false); });
-  $("zoomOut").addEventListener("click", () => { zoom(1 / 1.4); redraw(false); });
-  $("recenter").addEventListener("click", () => { if (MV.mode === "globe") MV.g.custom = false; else MV.m.custom = false; redraw(false); });
-  $("viewGlobe").addEventListener("click", () => { MV.mode = "globe"; paint(); requestAnimationFrame(() => redraw(false)); });
-  $("viewMap").addEventListener("click", () => { MV.mode = "map"; paint(); requestAnimationFrame(() => redraw(false)); });
+  cv.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const k = Math.exp(-clamp(e.deltaY, -240, 240) * (e.deltaMode === 1 ? 0.05 : 0.0022)); // trackpads send small steps, mice big ones
+    if (REDUCE_MOTION) { zoom(k); drawMap(false); return; }
+    zoomSmooth(k);
+  }, { passive: false });
+  const btnZoom = (k) => { if (REDUCE_MOTION) { zoom(k); drawMap(false); } else zoomSmooth(k); };
+  $("zoomIn").addEventListener("click", () => btnZoom(1.5));
+  $("zoomOut").addEventListener("click", () => btnZoom(1 / 1.5));
+  $("recenter").addEventListener("click", () => { vel = [0, 0]; zoomGoal = 1; if (MV.mode === "globe") MV.g.custom = false; else MV.m.custom = false; drawMap(false); });
+  $("viewGlobe").addEventListener("click", () => { MV.mode = "globe"; paint(); requestAnimationFrame(() => drawMap(false)); });
+  $("viewMap").addEventListener("click", () => { MV.mode = "map"; paint(); requestAnimationFrame(() => drawMap(false)); });
   paint();
 })();
 
@@ -1387,24 +1446,30 @@ const RAMP_LUT = (() => {
   return lut;
 })();
 function buildPrecip(f, inv, quality) {
-  const q = quality || 3, ow = Math.ceil(f.W / q), oh = Math.ceil(f.H / q);
-  const cv = document.createElement("canvas"); cv.width = ow; cv.height = oh;
-  const ctx = cv.getContext("2d"), img = ctx.createImageData(ow, oh);
-  const idx = [], lon = [], lat = [], val = [];
+  const q = quality || 3, ow = Math.ceil(f.W / q), oh = Math.ceil(f.H / q), n = ow * oh;
+  f.pgs = f.pgs || {};
+  let g = f.pgs[q];
+  if (!g || g.ow !== ow || g.oh !== oh) { // (re)made only when the size changes
+    const cv = document.createElement("canvas"); cv.width = ow; cv.height = oh;
+    const ctx = cv.getContext("2d");
+    g = f.pgs[q] = { q, ow, oh, cv, ctx, img: ctx.createImageData(ow, oh), idx: new Int32Array(n), lon: new Float32Array(n), lat: new Float32Array(n), val: new Float32Array(n), len: 0 };
+  }
+  g.img.data.fill(0);
+  let k = 0;
   for (let py = 0; py < oh; py++) for (let px = 0; px < ow; px++) {
     const ll = inv(px * q + q / 2, py * q + q / 2);
     if (!ll) continue;
-    const a = clamp(auroraVal(ll[0], ll[1], f.global) / 35);
+    const a = clamp(auroraVal(ll[0], ll[1]) / 35);
     if (a < 0.03) continue;
-    idx.push((py * ow + px) * 4); lon.push(ll[0]); lat.push(ll[1]); val.push(a);
+    g.idx[k] = (py * ow + px) * 4; g.lon[k] = ll[0]; g.lat[k] = ll[1]; g.val[k] = a; k++;
   }
-  f.pg = { q, ow, oh, cv, ctx, img, idx, lon: Float32Array.from(lon), lat: Float32Array.from(lat), val: Float32Array.from(val) };
+  g.len = k; f.pg = g;
 }
 function renderPrecip(f, t) {
   const g = f.pg;
   if (!g) return;
   const d = g.img.data;
-  for (let k = 0; k < g.idx.length; k++) {
+  for (let k = 0; k < g.len; k++) {
     const n = fbm(g.lon[k] * 0.55 + t * 0.35, g.lat[k] * 1.25 - t * 0.06); // drifts westward along the oval
     const v = clamp(g.val[k] * (0.68 + 0.6 * n));
     const li = Math.round(v * 255) * 4, o = g.idx[k];
@@ -1415,7 +1480,7 @@ function renderPrecip(f, t) {
   c.clearRect(0, 0, f.W, f.H);
   c.save();
   c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
-  if ("filter" in c) c.filter = "blur(2.5px)";
+  if ("filter" in c && g.q < 6) c.filter = "blur(1.5px)"; // (on the half-resolution layer)
   c.drawImage(g.cv, 0, 0, g.ow * g.q, g.oh * g.q);
   c.restore();
 }
@@ -1467,19 +1532,24 @@ function setFlow(f, P, W, H, pxPerDeg, global, b, inv, fast) {
     buildPrecip(f, inv, 6); renderPrecip(f, flowT / 60);
     return;
   }
+  // the soft oval layer is blurred anyway, so it's painted at half resolution; streaks at (at most) 1.25x
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  for (const [cv, ctx] of [[f.cv, f.ctx], [f.pre, f.pctx]]) {
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    cv.style.width = W + "px"; cv.style.height = H + "px";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const [cv, ctx, k] of [[f.cv, f.ctx, Math.min(dpr, 1.25)], [f.pre, f.pctx, 0.5]]) {
+    if (cv.width !== Math.round(W * k) || cv.height !== Math.round(H * k)) {
+      cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+      cv.style.width = W + "px"; cv.style.height = H + "px";
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+    }
   }
+  f.ctx.clearRect(0, 0, W, H);
   Object.assign(f, { P, W, H, pxPerDeg, global });
   buildPrecip(f, inv);
   renderPrecip(f, flowT / 60);
   // where particles may be born: visible cells with some activity, weighted by strength
   f.cells = []; f.total = 0;
   const la0 = b ? Math.floor(b.s) : -89, la1 = b ? Math.ceil(b.n) : 89, lo0 = b ? Math.floor(b.w) : -180, lo1 = b ? Math.ceil(b.e) : 179;
-  for (let la = la0; la <= la1; la++) for (let lo = lo0; lo <= lo1; lo++) {
+  const cs = pxPerDeg < 4 ? 2 : 1; // far out, 2° cells are plenty to place particles
+  for (let la = la0; la <= la1; la += cs) for (let lo = lo0; lo <= lo1; lo += cs) {
     const v = auroraVal(lo, la, global);
     if (v < 4) continue;
     const [x, y, fr] = P(lo, la);
@@ -1487,7 +1557,11 @@ function setFlow(f, P, W, H, pxPerDeg, global, b, inv, fast) {
     f.total += v; f.cells.push([lo, la, f.total]);
   }
   const n = f.cells.length ? Math.round(clamp(W * H / 1500, 140, 650)) : 0;
-  f.parts = f.anim ? Array.from({ length: n }, () => spawn(f, true)) : [];
+  const dataKey = [S.ovAt, S.ovFull, kpAt(Date.now())].join("|");
+  if (!f.anim) f.parts = [];
+  else if (f.dataKey === dataKey && f.parts.length === n) { /* only the view moved: the particles already live on the Earth */ }
+  else f.parts = Array.from({ length: n }, () => spawn(f, true));
+  f.dataKey = dataKey;
 }
 function spawn(f, anyAge) {
   const r = Math.random() * f.total;
@@ -1505,7 +1579,7 @@ function flowFrame() {
   flowT += 1;
   for (const f of [flowMain]) {
     if (!f || !f.P || !f.visible || f.base.closest("[hidden]")) continue;
-    if (flowT % 5 === 0) renderPrecip(f, flowT / 60); // the oval's texture drifts at ~12 fps
+    if (flowT % 5 === 0 && !MV.moving) renderPrecip(f, flowT / 60); // the oval's texture drifts at ~12 fps
     if (!f.parts.length) continue;
     const c = f.ctx;
     c.globalCompositeOperation = "destination-in"; c.fillStyle = "rgba(0,0,0,0.9)"; c.fillRect(0, 0, f.W, f.H); // fade the trails
@@ -1545,8 +1619,9 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
   function ridge(x) { return H * 0.86 - 26 * Math.sin(x / 140 + 1.3) - 16 * Math.sin(x / 57) - 34 * Math.sin(x / 390 + 0.4) - 10 * Math.sin(x / 23 + 2); }
   function frame(ts) {
     if (sky.video) return;
+    if (sky.hidden) { sky.paused = true; return; } // off-screen: stop until it scrolls back into view
     if (!reduce) requestAnimationFrame(frame);
-    if (ts - last < 33 && !reduce) return; last = ts;
+    if ((ts - last < 33 || MV.moving) && !reduce) return; last = ts;
     const t = (sky.t += reduce ? 0 : 0.012), I = sky.intensity;
     c.clearRect(0, 0, W, H);
     const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#050811"); bg.addColorStop(1, "#0b1424");
@@ -1569,6 +1644,10 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
     c.fillStyle = "#04070d"; c.fill();
   }
   size(); requestAnimationFrame(frame);
+  if ("IntersectionObserver" in window) new IntersectionObserver((es) => {
+    sky.hidden = !es[0].isIntersecting;
+    if (!sky.hidden && sky.paused) { sky.paused = false; requestAnimationFrame(frame); }
+  }).observe(document.querySelector(".hero"));
   new ResizeObserver(() => { size(); if (reduce) requestAnimationFrame(frame); }).observe(cv);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && reduce) requestAnimationFrame(frame); });
 })();
@@ -1600,7 +1679,11 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
   v.preload = reduce ? "metadata" : "auto";
   v.addEventListener("loadeddata", () => { show(); if (!reduce) v.play().catch(() => { /* autoplay refused: the first frame stays as a still */ }); }, { once: true });
   v.load();
-  document.addEventListener("visibilitychange", () => { if (!shown || reduce) return; if (document.hidden) v.pause(); else v.play().catch(() => {}); });
+  let heroInView = true;
+  const sync = () => { if (!shown || reduce) return; if (document.hidden || !heroInView) v.pause(); else v.play().catch(() => {}); };
+  document.addEventListener("visibilitychange", sync);
+  // the footage only plays while the hero is on screen, leaving the map the whole graphics budget
+  if ("IntersectionObserver" in window) new IntersectionObserver((es) => { heroInView = es[0].isIntersecting; sync(); }).observe(document.querySelector(".hero"));
 })();
 
 /* ---------- loading ---------- */
@@ -1789,7 +1872,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 function hitSpot(e, roomy) {
   const rc = $("map").getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
   let hit = null, bd = Infinity;
-  for (const p of S.mapPts || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < p.r + (roomy ? 18 : 8) && d < bd) { bd = d; hit = p; } }
+  for (const p of S.mapPts || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < p.r + (roomy ? 18 : 10) && d < bd) { bd = d; hit = p; } }
   return hit;
 }
 const rowFor = (id) => id.startsWith("w:") ? (S.worldRanked || []).find(x => "w:" + x.s.id === id) : S.ranked.find(x => x.s.id === id);
