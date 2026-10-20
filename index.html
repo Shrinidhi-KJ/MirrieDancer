@@ -76,7 +76,6 @@ h2 {
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 18px; flex-wrap: wrap; }
 .brand { display: flex; align-items: baseline; gap: 10px; }
 .brand b { font: 900 26px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
-.brand span { color: var(--mist); font-size: 13px; }
 .live { display: flex; align-items: center; gap: 10px; font: 400 12px/1.2 var(--mono); color: var(--mist); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 0 transparent; }
 .dot.on { background: var(--dancer); animation: pulse 2.4s ease-out infinite; }
@@ -328,7 +327,7 @@ footer p { margin: 0; max-width: 90ch; }
 <body>
 <header class="bar">
   <div class="wrap">
-    <div class="brand"><b>Mirrie Dancers</b><span>Scotland’s aurora call</span></div>
+    <div class="brand"><b>Mirrie Dancers</b></div>
     <div class="live">
       <i class="dot" id="dot"></i><span id="liveText">Reading the sky…</span>
       <button class="btn" id="refresh" type="button" aria-label="Refresh live data">Refresh</button>
@@ -1080,6 +1079,12 @@ const token = (n) => TOKENS[n] || (TOKENS[n] = getComputedStyle(document.documen
 /* one map, two ways to look at it:
    Globe: a 3D globe that opens zoomed in on you (or Scotland) and pulls back to the whole planet;
    Map: a flat map of the whole world. Both can be dragged and zoomed. */
+// a spot's name sits to its right, or its left near the right edge, or above it when neither side has room
+function spotLabel(c, W, lab, lw, x, y, r) {
+  if (x + r + 8 + lw <= W - 8) return c.fillText(lab, x + r + 8, y + 4);
+  if (x - r - 8 - lw >= 8) return c.fillText(lab, x - r - 8 - lw, y + 4);
+  c.fillText(lab, clamp(x - lw / 2, 8, W - lw - 8), y - r - 8);
+}
 const MV = { mode: "globe", g: { custom: false, lat: 0, lon: 0, R: 0 }, m: { custom: false, lonC: 0, latC: 15, s: 1 }, dragging: false, justDragged: false };
 // While the map moves, the hero's frosted panel swaps its blur for a plain tint and the canvas sky holds still:
 // re-blurring the backdrop behind a moving map on every frame is what made it stutter there.
@@ -1244,7 +1249,7 @@ function drawMap(fast) {
     c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
     c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
     if (sel) { c.beginPath(); c.arc(x, y, Math.max(rad0, 4) + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); }
-    if (sel && zoomK > 0.5) { c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
+    if (sel && zoomK > 0.5) { c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; spotLabel(c, W, lab, lw, x, y, rad0); c.font = "10px " + col("--mono"); }
   }
   // aurora spots around the world, once zoomed in far enough to tell them apart
   if (pxPerDeg >= 4.5 && S.worldRanked) {
@@ -1261,7 +1266,7 @@ function drawMap(fast) {
       if (sel) {
         c.beginPath(); c.arc(x, y, Math.max(rad0, 4) + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke();
         c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width;
-        c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono");
+        spotLabel(c, W, lab, lw, x, y, rad0); c.font = "10px " + col("--mono");
       }
     }
   }
@@ -1983,10 +1988,10 @@ mapEl.addEventListener("click", (e) => {
 document.addEventListener("click", (e) => { if (pinned && !$("mapbox").contains(e.target)) hideTip(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (pinned || hoverId)) hideTip(); });
 
-/* ---------- preview layout: map and list inside the hero, over the video (?layout=hero, or #hero) ---------- */
+/* ---------- hero layout: map and list inside the hero, over the video (?layout=classic puts them back below) ---------- */
 (function heroLayout() {
-  let on = false;
-  try { on = new URLSearchParams(location.search).get("layout") === "hero" || location.hash === "#hero"; } catch (e) { /* default layout */ }
+  let on = true;
+  try { on = new URLSearchParams(location.search).get("layout") !== "classic"; } catch (e) { /* hero layout */ }
   if (!on) return;
   const plan = $("heroPlan"), where = $("where"), inner = where.querySelector(".wrap");
   while (inner.firstChild) plan.appendChild(inner.firstChild);
