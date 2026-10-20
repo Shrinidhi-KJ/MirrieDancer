@@ -523,7 +523,7 @@ footer p { margin: 0; max-width: 90ch; }
 <footer>
   <div class="wrap">
     <p id="src">Sources loading…</p>
-    <p>Aurora data: NOAA Space Weather Prediction Center (OVATION aurora model, planetary Kp forecast, real-time solar wind). Cloud: Open-Meteo. Chances are a best guess, not a promise. The sky does what it likes.</p>
+    <p>Aurora data: NOAA Space Weather Prediction Center (OVATION aurora model, planetary Kp forecast, real-time solar wind). Cloud: Open-Meteo. Chances are a best guess, not a promise. The sky does what it likes. Your rough first-visit location comes from your IP address, looked up via geojs.io (or ipapi.co). Your exact location is only used if you allow it, and it is stored only on your device.</p>
   </div>
 </footer>
 
@@ -679,6 +679,9 @@ const URLS = {
 };
 const mcpReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("mcp").catch(() => null) : Promise.resolve(null);
 const via = {}; // per source: "live" | "snapshot" | "connector"
+const snapAt = {}; // per snapshot source: when the backup copy was made (ms; NaN if the server sent no Last-Modified)
+// a backup copy older than an hour (or of unknown age) is too old to say what the solar wind is doing right now
+const stale = (k) => via[k] === "snapshot" && !(Date.now() - snapAt[k] < 3600000);
 async function getJSON(key, url) {
   url = url || URLS[key];
   try {
@@ -687,7 +690,7 @@ async function getJSON(key, url) {
   } catch (e) { /* blocked or offline: try the snapshot */ }
   try {
     const r = await fetch("data/" + key + ".json", { cache: "no-store" });
-    if (r.ok) { const j = await r.json(); via[key] = "snapshot"; return j; }
+    if (r.ok) { const j = await r.json(); via[key] = "snapshot"; snapAt[key] = Date.parse(r.headers.get("Last-Modified")); return j; }
   } catch (e) { /* no snapshot here */ }
   const mcp = await mcpReady;
   if (!mcp) throw Object.assign(new Error("No route to live data"), { code: "no_route" });
@@ -703,8 +706,8 @@ async function getJSON(key, url) {
 const usesConnector = () => Object.values(via).includes("connector");
 
 const S = {
-  kp: null, bz: null, bt: null, wind: null, windAt: null, ov: null, ovAt: null, wx: null,
-  status: {}, updated: null, pageErr: null,
+  kp: null, bz: null, wind: null, ov: null, ovAt: null, wx: null,
+  status: {}, updated: null,
   town: store.get("town", null), here: null, sel: null, ranked: [], best: null, sort: store.get("sort", "best")
 };
 
@@ -714,8 +717,10 @@ function parseKp(j) {
     const h = j[0];
     rows = j.slice(1).map(r => Object.fromEntries(h.map((k, i) => [k, r[i]])));
   }
-  return rows.map(r => ({ t: Date.parse(String(r.time_tag).replace(" ", "T") + (/Z$/.test(r.time_tag) ? "" : "Z")), kp: parseFloat(r.kp), kind: r.observed || "", g: r.noaa_scale || null }))
+  const out = rows.map(r => ({ t: Date.parse(String(r.time_tag).replace(" ", "T") + (/Z$/.test(r.time_tag) ? "" : "Z")), kp: parseFloat(r.kp), kind: r.observed || "", g: r.noaa_scale || null }))
     .filter(r => isFinite(r.t) && isFinite(r.kp)).sort((a, b) => a.t - b.t);
+  if (!out.length) throw new Error("Kp forecast has no readable rows"); // format changed: fail loudly instead of showing nothing
+  return out;
 }
 function parseOv(j) {
   const grid = new Float32Array(360 * 181);
@@ -828,7 +833,7 @@ function compute() {
     const ferry = !!s.group && s.group !== town.group;
     const worth = best.p - Math.min(45, mins / 60 * 8) - (ferry ? 40 : 0);
     return { s, i, series, best, nowH, dist, mins, ferry, worth };
-  }).sort((a, b) => b.worth - a.worth || a.dist - b.dist);
+  }).sort((a, b) => (b.best.p > 0) - (a.best.p > 0) || b.worth - a.worth || a.dist - b.dist); // a spot with any chance beats a 0% one
   if (!S.picked || !SPOTS.some(s => s.id === S.sel)) S.sel = S.ranked[0].s.id;
   const from = S.here || town, next = Array.from({ length: 13 }, (_, k) => cur + k * HOUR);
   S.worldRanked = WORLD_SPOTS.map((w, i) => {
@@ -860,7 +865,7 @@ function renderHero() {
     $("why").textContent = "";
     return;
   }
-  const nowBest = mineMode ? top.nowH.p : Math.max(...S.ranked.map(r => r.nowH.p));
+  const nowBest = mineMode ? top.nowH.p : Math.max(...S.ranked.filter(r => r.mins <= 120 && !r.ferry).map(r => r.nowH.p)); // only spots within about 2 h drive, no ferry; empty gives -Infinity, which never reaches 60;
   const p = top.best.p;
   let tier = TIERS.find(t => p >= t.min);
   if (top.nowH.p >= 55 || nowBest >= 60) tier = { word: "Go now", glow: true, quip: "It’s happening right now. Get out, look north, and keep watching for at least an hour." };
@@ -900,7 +905,7 @@ function renderHero() {
 function renderSpots() {
   const ol = $("spots");
   ol.textContent = "";
-  const bestId = S.ranked[0] && S.ranked[0].s.id;
+  const bestId = S.ranked[0] && S.ranked[0].best.p > 0 ? S.ranked[0].s.id : null; // no "best bet" on a 0% night
   const list = S.sort === "near" ? S.ranked.slice().sort((a, b) => a.dist - b.dist) : S.ranked;
   list.forEach((r) => {
     const li = document.createElement("li");
@@ -1061,7 +1066,10 @@ function renderStatus() {
   }
   const vs = Object.values(via);
   if (vs.includes("connector")) el.append("Fetched through your Firecrawl connector.");
-  else if (vs.includes("snapshot")) el.append("Some feeds come from a copy refreshed every 15 minutes.");
+  else if (vs.includes("snapshot")) {
+    const t = Math.min(...Object.keys(via).filter(k => via[k] === "snapshot").map(k => snapAt[k])), age = Date.now() - t; // NaN if any age is unknown
+    el.append("Some feeds come from a backup copy" + (isNaN(age) ? " of unknown age." : " from " + (age < 3600000 ? Math.round(age / 60000) + " min" : Math.round(age / 3600000) + " h") + " ago."));
+  }
 }
 function renderAll() {
   compute(); renderHero(); renderMine(); renderSpots(); renderTonight(); renderWeather(); renderStatus(); drawMap(); checkAlert();
@@ -1705,21 +1713,27 @@ const CODE_COPY = {
   blocked_by_policy: "Your organisation blocks the Firecrawl connector here, so live data can’t load.",
   no_route: "This copy of the page can’t reach the live data feeds."
 };
+// cloud forecasts cover 57 places a call and Open-Meteo's free daily limit is per IP, so reuse them for 30 minutes (NaN before the first fetch)
+const cloudJob = (k) => async () => {
+  if (via[k] !== "snapshot" && Date.now() - S[k + "At"] < 30 * 60000) return; // a backup copy is re-checked every time
+  const j = await getJSON(k); const arr = Array.isArray(j) ? j : [j];
+  S[k] = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); S[k + "At"] = Date.now();
+};
 async function load() {
   if (loading) return; loading = true;
   $("refresh").disabled = true; setLive("Updating…", "on");
   const jobs = {
     kp: async () => { S.kp = parseKp(await getJSON("kp")); },
-    mag: async () => { const j = await getJSON("mag"); const r = Array.isArray(j) ? j[0] : j; S.bz = Math.round(parseFloat(r.bz_gsm ?? r.Bz) * 10) / 10; S.bt = parseFloat(r.bt ?? r.Bt); if (!isFinite(S.bz)) S.bz = null; },
-    wind: async () => { const j = await getJSON("wind"); const r = Array.isArray(j) ? j[0] : j; S.wind = parseFloat(r.proton_speed ?? r.WindSpeed); if (!isFinite(S.wind)) S.wind = null; },
-    wx: async () => { const j = await getJSON("wx"); const arr = Array.isArray(j) ? j : [j]; S.wx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
-    wwx: async () => { const j = await getJSON("wwx"); const arr = Array.isArray(j) ? j : [j]; S.wwx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
+    mag: async () => { const j = await getJSON("mag"); if (stale("mag")) { S.bz = null; throw new Error("Backup copy too old"); } const r = Array.isArray(j) ? j[0] : j; S.bz = Math.round(parseFloat(r.bz_gsm ?? r.Bz) * 10) / 10; if (!isFinite(S.bz)) S.bz = null; },
+    wind: async () => { const j = await getJSON("wind"); if (stale("wind")) { S.wind = null; throw new Error("Backup copy too old"); } const r = Array.isArray(j) ? j[0] : j; S.wind = parseFloat(r.proton_speed ?? r.WindSpeed); if (!isFinite(S.wind)) S.wind = null; },
+    wx: cloudJob("wx"),
+    wwx: cloudJob("wwx"),
     ov: async () => { const j = await getJSON("ov"); S.ov = parseOv(j); S.ovS = smoothOv(S.ov); S.ovFull = (j.coordinates || []).length > 30000; /* the site's backup copy only covers Scotland */ S.ovAt = Date.parse(j["Forecast Time"] || j["Observation Time"]) || null; }
   };
   const errs = {};
   const run = async (k) => { try { await jobs[k](); S.status[k] = "ok"; } catch (e) { S.status[k] = "fail"; errs[k] = e; } };
   await run("kp"); // first call alone, so any connector consent prompt appears once
-  await Promise.all(["mag", "wind", "wx", "ov", "wwx"].map(run));
+  await Promise.all(["mag", "wind", "wx", "ov", "wwx"].filter(k => k !== "wwx" || !usesConnector()).map(run));
   loading = false; $("refresh").disabled = false;
   const failed = Object.keys(errs);
   const codes = failed.map(k => errs[k] && errs[k].code).filter(Boolean);
@@ -1749,10 +1763,10 @@ async function loadMine() {
   renderAll();
 }
 let timer = null;
-function schedule() { clearTimeout(timer); timer = setTimeout(load, (usesConnector() ? 15 : 5) * 60000); }
+function schedule() { clearTimeout(timer); timer = setTimeout(load, (usesConnector() ? 60 : 5) * 60000); }
 $("refresh").addEventListener("click", load);
 $("noticeBtn").addEventListener("click", load);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > 10 * 60000) load(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > (usesConnector() ? 60 : 10) * 60000) load(); });
 
 /* ---------- where am I: the visitor's location by default, else a town they picked ---------- */
 const sel = $("town");

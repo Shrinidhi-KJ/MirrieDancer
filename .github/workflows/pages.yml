@@ -26,23 +26,36 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Restore hero footage
-        uses: actions/cache@v4
+        id: media
+        uses: actions/cache/restore@v4
         with:
           path: media
           key: hero-media-v1-${{ hashFiles('scripts/hero-media.sh') }}
       - name: Prepare hero footage (first run only)
         run: bash scripts/hero-media.sh media
+      # Saved straight away, so a red run later (a changed feed format) can't stop the footage being cached.
+      - name: Cache hero footage
+        if: steps.media.outputs.cache-hit != 'true' && hashFiles('media/hero-tall.mp4') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: media
+          key: hero-media-v1-${{ hashFiles('scripts/hero-media.sh') }}
       - name: Build site with a fresh data snapshot
         run: |
+          node scripts/snapshot.mjs --self-test
           mkdir -p _site/data
           cp index.html _site/
           if [ -d media ]; then cp -r media _site/media; fi
-          node scripts/snapshot.mjs _site/data
+          node scripts/snapshot.mjs _site/data shape-problems.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
+      # After deploying, so a changed feed format never blocks a code push but still turns the run red.
+      - name: Fail if a feed changed format
+        run: |
+          [ ! -s shape-problems.txt ] || { sed 's/^/::error::/' shape-problems.txt; exit 1; }

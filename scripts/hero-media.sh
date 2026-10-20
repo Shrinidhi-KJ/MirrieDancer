@@ -5,10 +5,11 @@
 # Footage: "Northern lights timelapse" by T Honkamies, Finland (Pexels licence: free to use
 # and modify, no attribution required; we credit anyway).
 # Usage: scripts/hero-media.sh <out-dir>. Never fails the deploy: without footage
-# the page keeps its animated canvas sky.
+# the page keeps its animated canvas sky. Files are built in a temp dir and moved into
+# <out-dir> only when complete, so a failed run never leaves an empty folder for the
+# workflow's cache step to save.
 set -uo pipefail
 out="${1:-media}"
-mkdir -p "$out"
 if [ -s "$out/hero-wide-1080.mp4" ] && [ -s "$out/hero-tall.mp4" ]; then
   echo "hero footage already prepared"; exit 0
 fi
@@ -21,7 +22,7 @@ if ! command -v ffmpeg >/dev/null; then
   sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null || { echo "ffmpeg unavailable, skipping footage"; exit 0; }
 fi
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)"; mkdir "$tmp/o"
 if ! curl -fsSL --retry 3 -A "$UA" -e "https://www.pexels.com/" -o "$tmp/src.mp4" "$SRC_URL"; then
   echo "footage download failed"; rm -rf "$tmp"; exit 0
 fi
@@ -36,16 +37,21 @@ encode() { # out, extra filters, crf
     -map "[v]" -c:v libx264 -preset slow -crf "$3" -profile:v high -movflags +faststart "$1"
 }
 
-encode "$out/hero-wide-1440.mp4" "scale=2560:-2" 26 &&
-encode "$out/hero-wide-1080.mp4" "scale=1920:-2" 26 &&
-ffmpeg -loglevel error -y -i "$out/hero-wide-1080.mp4" -frames:v 1 -q:v 4 "$out/hero-wide.jpg" ||
+encode "$tmp/o/hero-wide-1440.mp4" "scale=2560:-2" 26 &&
+encode "$tmp/o/hero-wide-1080.mp4" "scale=1920:-2" 26 &&
+ffmpeg -loglevel error -y -i "$tmp/o/hero-wide-1080.mp4" -frames:v 1 -q:v 4 "$tmp/o/hero-wide.jpg" ||
 echo "landscape footage failed to encode"
 
 # Portrait crop for phones, centred a little right of middle where the curtains are brightest.
-encode "$out/hero-tall.mp4" "crop=ih*9/16:ih:min(iw-ih*9/16\,iw*0.56-ih*9/32):0,scale=720:1280" 26 &&
-ffmpeg -loglevel error -y -i "$out/hero-tall.mp4" -frames:v 1 -q:v 4 "$out/hero-tall.jpg" ||
+encode "$tmp/o/hero-tall.mp4" "crop=ih*9/16:ih:min(iw-ih*9/16\,iw*0.56-ih*9/32):0,scale=720:1280" 26 &&
+ffmpeg -loglevel error -y -i "$tmp/o/hero-tall.mp4" -frames:v 1 -q:v 4 "$tmp/o/hero-tall.jpg" ||
 echo "portrait footage failed to encode"
 
+# Same files the skip check at the top looks for.
+if [ -s "$tmp/o/hero-wide-1080.mp4" ] && [ -s "$tmp/o/hero-tall.mp4" ]; then
+  mkdir -p "$out" && mv "$tmp"/o/* "$out"/ && ls -la "$out"
+else
+  echo "footage incomplete, skipping"
+fi
 rm -rf "$tmp"
-ls -la "$out"
 exit 0
