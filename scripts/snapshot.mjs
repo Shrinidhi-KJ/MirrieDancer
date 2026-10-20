@@ -7,18 +7,24 @@ import path from "node:path";
 const out = process.argv[2] || "_site/data";
 fs.mkdirSync(out, { recursive: true });
 
-// Read spot coordinates from the page so the cloud forecast always matches it.
+// Read spot coordinates from the page so the cloud forecasts always match it.
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
-const spots = html.slice(html.indexOf("const SPOTS = ["), html.indexOf("];", html.indexOf("const SPOTS = [")));
-const coords = [...spots.matchAll(/lat: (-?[\d.]+), lon: (-?[\d.]+)/g)].map((m) => [m[1], m[2]]);
+function coordsOf(name) {
+  const start = html.indexOf("const " + name + " = [");
+  const block = html.slice(start, html.indexOf("];", start));
+  return [...block.matchAll(/lat: (-?[\d.]+), lon: (-?[\d.]+)/g)].map((m) => [m[1], m[2]]);
+}
+const cloudUrl = (cs) => "https://api.open-meteo.com/v1/forecast?latitude=" + cs.map((c) => c[0]).join(",") +
+  "&longitude=" + cs.map((c) => c[1]).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT";
+const coords = coordsOf("SPOTS"), worldCoords = coordsOf("WORLD_SPOTS");
 
 const feeds = {
   kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
   mag: "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json",
   wind: "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json",
   ov: "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
-  wx: "https://api.open-meteo.com/v1/forecast?latitude=" + coords.map((c) => c[0]).join(",") +
-    "&longitude=" + coords.map((c) => c[1]).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT",
+  wx: cloudUrl(coords),
+  wwx: cloudUrl(worldCoords),
 };
 
 // Keep only the part of the aurora model the map uses (around Scotland), which cuts ~1 MB to a few KB.

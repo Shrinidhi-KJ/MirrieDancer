@@ -525,6 +525,45 @@ const SPOTS = [
   { id: "arthurs", name: "Arthur’s Seat", area: "Edinburgh", lat: 55.944, lon: -3.162, sky: 0.55, note: "Strong city glow. Only for big storms, but a decent phone photo is possible." },
   { id: "galloway", name: "Clatteringshaws Loch", area: "Galloway Forest Dark Sky Park", lat: 55.060, lon: -4.280, sky: 1.0, note: "Britain’s first Dark Sky Park. It’s far south, so it needs a strong storm." }
 ];
+/* well-known aurora viewing spots around the world, shown when you zoom the map in on them */
+const WORLD_SPOTS = [
+  { id: "tromso", name: "Tromsø", area: "Northern Norway", lat: 69.65, lon: 18.96, sky: 0.75, note: "Norway’s aurora capital. Drive out of the city lights towards Ersfjordbotn or Kvaløya." },
+  { id: "senja", name: "Senja", area: "Northern Norway", lat: 69.30, lon: 17.30, sky: 1.0, note: "Dramatic island with dark fjords and open skies to the north." },
+  { id: "lofoten", name: "Reine, Lofoten", area: "Lofoten Islands, Norway", lat: 67.93, lon: 13.09, sky: 0.95, note: "Fishing cabins under jagged peaks. One of the most photographed aurora views in the world." },
+  { id: "alta", name: "Alta", area: "Finnmark, Norway", lat: 69.97, lon: 23.27, sky: 0.85, note: "Known as the town of the northern lights, with a famously dry inland climate." },
+  { id: "nordkapp", name: "North Cape", area: "Finnmark, Norway", lat: 71.17, lon: 25.78, sky: 1.0, note: "Europe’s northern edge, looking out over the Barents Sea." },
+  { id: "svalbard", name: "Longyearbyen", area: "Svalbard", lat: 78.22, lon: 15.65, sky: 0.9, note: "Polar night means the aurora can show even at midday in winter." },
+  { id: "abisko", name: "Abisko", area: "Swedish Lapland", lat: 68.35, lon: 18.83, sky: 1.0, note: "Famous for its ‘blue hole’ of clear sky that sits over Lake Torneträsk." },
+  { id: "kiruna", name: "Kiruna", area: "Swedish Lapland", lat: 67.86, lon: 20.23, sky: 0.8, note: "Sweden’s northernmost town, close to the Icehotel at Jukkasjärvi." },
+  { id: "rovaniemi", name: "Rovaniemi", area: "Finnish Lapland", lat: 66.50, lon: 25.73, sky: 0.75, note: "On the Arctic Circle. Head a few kilometres out of town to the riverbanks." },
+  { id: "saariselka", name: "Saariselkä", area: "Finnish Lapland", lat: 68.42, lon: 27.41, sky: 1.0, note: "Fells and forest with very little light pollution, famed for glass igloos." },
+  { id: "levi", name: "Levi", area: "Finnish Lapland", lat: 67.80, lon: 24.81, sky: 0.85, note: "Ski resort with dark fell tops a short walk away." },
+  { id: "thingvellir", name: "Þingvellir", area: "Near Reykjavík, Iceland", lat: 64.26, lon: -21.13, sky: 1.0, note: "National park 45 minutes from Reykjavík, away from the city glow." },
+  { id: "jokulsarlon", name: "Jökulsárlón", area: "South Iceland", lat: 64.05, lon: -16.18, sky: 1.0, note: "Glacier lagoon where icebergs reflect the aurora." },
+  { id: "kirkjufell", name: "Kirkjufell", area: "Snæfellsnes, Iceland", lat: 64.94, lon: -23.31, sky: 1.0, note: "Iceland’s most photographed mountain, with a waterfall in the foreground." },
+  { id: "myvatn", name: "Mývatn", area: "North Iceland", lat: 65.60, lon: -17.00, sky: 1.0, note: "Lake and lava fields in Iceland’s drier north, often clearer than the south." },
+  { id: "faroe", name: "Tórshavn", area: "Faroe Islands", lat: 62.01, lon: -6.77, sky: 0.85, note: "Between Scotland and Iceland, right under the aurora zone on good nights." },
+  { id: "teriberka", name: "Teriberka", area: "Kola Peninsula, Russia", lat: 69.16, lon: 35.14, sky: 1.0, note: "Remote village on the Barents Sea coast." },
+  { id: "kangerlussuaq", name: "Kangerlussuaq", area: "West Greenland", lat: 67.01, lon: -50.70, sky: 1.0, note: "Inland, dry and clear: one of the best places on Earth for steady aurora." },
+  { id: "nuuk", name: "Nuuk", area: "Greenland", lat: 64.18, lon: -51.72, sky: 0.8, note: "Greenland’s capital, with fjords on its doorstep." },
+  { id: "yellowknife", name: "Yellowknife", area: "Northwest Territories, Canada", lat: 62.45, lon: -114.37, sky: 0.85, note: "Right under the oval and famously clear: aurora on most winter nights." },
+  { id: "whitehorse", name: "Whitehorse", area: "Yukon, Canada", lat: 60.72, lon: -135.05, sky: 0.8, note: "Yukon’s capital, with dark lakes and valleys close by." },
+  { id: "churchill", name: "Churchill", area: "Manitoba, Canada", lat: 58.77, lon: -94.17, sky: 0.9, note: "On Hudson Bay, famous for polar bears and the aurora." },
+  { id: "iqaluit", name: "Iqaluit", area: "Nunavut, Canada", lat: 63.75, lon: -68.52, sky: 0.85, note: "Arctic capital on Baffin Island." },
+  { id: "jasper", name: "Jasper", area: "Alberta, Canada", lat: 52.87, lon: -118.08, sky: 1.0, note: "A huge Dark Sky Preserve in the Rockies. Needs a decent storm this far south." },
+  { id: "banff", name: "Lake Minnewanka", area: "Banff, Canada", lat: 51.25, lon: -115.50, sky: 0.95, note: "Mountain lake near Banff that faces north." },
+  { id: "fairbanks", name: "Fairbanks", area: "Alaska, USA", lat: 64.84, lon: -147.72, sky: 0.8, note: "Under the oval with cold, clear winters. Drive up to Cleary Summit." },
+  { id: "coldfoot", name: "Coldfoot", area: "Brooks Range, Alaska", lat: 67.25, lon: -150.18, sky: 1.0, note: "Truck-stop village north of the Arctic Circle, as dark as it gets." },
+  { id: "marquette", name: "Marquette", area: "Michigan, USA", lat: 46.54, lon: -87.40, sky: 0.8, note: "Lake Superior shoreline with a clear view north on strong nights." },
+  { id: "ely", name: "Boundary Waters", area: "Ely, Minnesota", lat: 47.90, lon: -91.87, sky: 1.0, note: "Wilderness lakes on the Canadian border. A Dark Sky Sanctuary." },
+  { id: "cherrysprings", name: "Cherry Springs", area: "Pennsylvania, USA", lat: 41.66, lon: -77.82, sky: 1.0, note: "One of the darkest spots in the eastern US. Only during big storms." },
+  { id: "acadia", name: "Acadia", area: "Maine, USA", lat: 44.34, lon: -68.27, sky: 0.95, note: "Rocky coast in Maine with a dark northern sky." },
+  { id: "tekapo", name: "Lake Tekapo", area: "Canterbury, New Zealand", lat: -44.00, lon: 170.48, sky: 1.0, note: "In a Dark Sky Reserve. Look south for the aurora australis." },
+  { id: "stewart", name: "Stewart Island", area: "Southland, New Zealand", lat: -46.90, lon: 168.13, sky: 1.0, note: "Its Māori name, Rakiura, means ‘glowing skies’." },
+  { id: "hobart", name: "Mount Wellington", area: "Hobart, Tasmania", lat: -42.90, lon: 147.24, sky: 0.75, note: "Above Hobart with a wide southern view." },
+  { id: "bruny", name: "Bruny Island", area: "Tasmania, Australia", lat: -43.30, lon: 147.30, sky: 1.0, note: "Dark beaches facing south towards Antarctica." },
+  { id: "ushuaia", name: "Ushuaia", area: "Tierra del Fuego, Argentina", lat: -54.80, lon: -68.30, sky: 0.8, note: "The world’s southernmost city. Aurora is rare but possible in big storms." }
+];
 const TOWNS = [
   ["Aberdeen", 57.150, -2.094], ["Aviemore", 57.195, -3.825], ["Ayr", 55.458, -4.629], ["Dumfries", 55.070, -3.605],
   ["Dundee", 56.462, -2.971], ["Edinburgh", 55.953, -3.189], ["Elgin", 57.649, -3.318], ["Fort William", 56.819, -5.105],
@@ -606,7 +645,8 @@ const URLS = {
   mag: "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json",
   wind: "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json",
   ov: "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
-  wx: "https://api.open-meteo.com/v1/forecast?latitude=" + SPOTS.map(s => s.lat).join(",") + "&longitude=" + SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT"
+  wx: "https://api.open-meteo.com/v1/forecast?latitude=" + SPOTS.map(s => s.lat).join(",") + "&longitude=" + SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT",
+  wwx: "https://api.open-meteo.com/v1/forecast?latitude=" + WORLD_SPOTS.map(s => s.lat).join(",") + "&longitude=" + WORLD_SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT"
 };
 const mcpReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("mcp").catch(() => null) : Promise.resolve(null);
 const via = {}; // per source: "live" | "snapshot" | "connector"
@@ -761,6 +801,13 @@ function compute() {
     return { s, i, series, best, nowH, dist, mins, ferry, worth };
   }).sort((a, b) => b.worth - a.worth || a.dist - b.dist);
   if (!S.picked || !SPOTS.some(s => s.id === S.sel)) S.sel = S.ranked[0].s.id;
+  const from = S.here || town, next = Array.from({ length: 13 }, (_, k) => cur + k * HOUR);
+  S.worldRanked = WORLD_SPOTS.map((w, i) => {
+    const sp = Object.assign({}, w, { need: kpNeedAt(w.lat, w.lon), wx: S.wwx ? S.wwx[i] || null : null });
+    const series = next.map(t => score(sp, -1, t, now));
+    const best = series.reduce((a, b) => (b.p > a.p ? b : a), series[0]);
+    return { s: sp, world: true, series, best, nowH: series[0], dist: km(from, w) };
+  });
   S.townObj = town;
 }
 
@@ -973,7 +1020,7 @@ function renderWeather() {
   $("kpNeedKey").innerHTML = '<i style="background:none;border-top:2px dashed var(--frost);height:0;width:14px"></i>Needed near ' + S.townObj.name;
 }
 function renderStatus() {
-  const names = { kp: "Kp forecast", mag: "Solar wind field", wind: "Solar wind speed", ov: "Aurora oval", wx: "Cloud forecast" };
+  const names = { kp: "Kp forecast", mag: "Solar wind field", wind: "Solar wind speed", ov: "Aurora oval", wx: "Cloud forecast", wwx: "World spots cloud" };
   if (S.here) names.here = "Your cloud forecast";
   const el = $("src"); el.textContent = "";
   for (const k of Object.keys(names)) {
@@ -1144,6 +1191,25 @@ function drawMap(fast) {
     if (sel) { c.beginPath(); c.arc(x, y, Math.max(rad0, 4) + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke(); }
     if (sel && zoomK > 0.5) { c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width; c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono"); }
   }
+  // aurora spots around the world, once zoomed in far enough to tell them apart
+  if (pxPerDeg >= 4.5 && S.worldRanked) {
+    const wk = clamp(Math.sqrt(pxPerDeg / 18), 0.5, 1.15);
+    for (const r of S.worldRanked) {
+      const [x, y, fr] = P(r.s.lon, r.s.lat);
+      if (!visible(x, y, fr)) continue;
+      const id = "w:" + r.s.id, sel = id === S.wsel, p = r.best.p, rad0 = (4 + p / 14) * wk;
+      const cc = p >= 60 ? col("--heather") : p >= 35 ? col("--dancer") : p >= 15 ? col("--teal") : col("--dim");
+      S.mapPts.push({ id, x, y, r: Math.max(rad0, 5) });
+      if (id === hoverId && !sel) { c.beginPath(); c.arc(x, y, rad0 + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.globalAlpha = 0.6; c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
+      c.beginPath(); c.arc(x, y, rad0 + 6, 0, Math.PI * 2); c.fillStyle = cc; c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1;
+      c.beginPath(); c.arc(x, y, rad0, 0, Math.PI * 2); c.fillStyle = cc; c.fill();
+      if (sel) {
+        c.beginPath(); c.arc(x, y, Math.max(rad0, 4) + 5, 0, Math.PI * 2); c.strokeStyle = col("--frost"); c.lineWidth = 1.5; c.stroke();
+        c.fillStyle = col("--frost"); c.font = "600 12px " + col("--body"); const lab = r.s.name + " · " + p + "%", lw = c.measureText(lab).width;
+        c.fillText(lab, x + rad0 + 8 + lw > W - 8 ? x - rad0 - 8 - lw : x + rad0 + 8, y + 4); c.font = "10px " + col("--mono");
+      }
+    }
+  }
   $("ovTime").textContent = S.ov && (S.ovFull || local) ? (S.ovAt ? "OVATION model, " + tf.format(S.ovAt) : "") : "Estimated from Kp";
 
   // the oval layers (radar-style glow and flowing particles) for whatever is in view
@@ -1165,16 +1231,16 @@ function drawMap(fast) {
 }
 /* glide the map so a place sits in the middle: zoom back in to the local view if we're further out */
 let flight = 0;
-function flyTo(place) {
+function flyTo(place, wide) {
   if (!MV.cur) { drawMap(); return; }
   cancelAnimationFrame(flight);
   const v = MV.cur;
   let from, to;
   if (MV.mode === "globe") {
-    const R0 = v.R, R1 = Math.max(R0, MV.fitR || R0);
+    const R0 = v.R, local = (MV.fitR || R0) / (wide ? 2.4 : 1), R1 = wide ? clamp(R0, local, local * 1.6) : Math.max(R0, local);
     from = { lat: v.lat0, lon: v.lon0, z: R0 }; to = { lat: place.lat, lon: place.lon, z: R1 };
   } else {
-    const s0 = v.s, s1 = Math.max(s0, (MV.fitS || 1) * 26);
+    const s0 = v.s, local = (MV.fitS || 1) * (wide ? 12 : 26), s1 = wide ? clamp(s0, local, local * 1.6) : Math.max(s0, local);
     from = { lat: v.latC, lon: v.lonC, z: s0 }; to = { lat: place.lat, lon: place.lon, z: s1 };
   }
   const dLon = wrapLon(to.lon - from.lon), dLat = to.lat - from.lat, zr = to.z / from.z;
@@ -1528,17 +1594,18 @@ async function load() {
     mag: async () => { const j = await getJSON("mag"); const r = Array.isArray(j) ? j[0] : j; S.bz = Math.round(parseFloat(r.bz_gsm ?? r.Bz) * 10) / 10; S.bt = parseFloat(r.bt ?? r.Bt); if (!isFinite(S.bz)) S.bz = null; },
     wind: async () => { const j = await getJSON("wind"); const r = Array.isArray(j) ? j[0] : j; S.wind = parseFloat(r.proton_speed ?? r.WindSpeed); if (!isFinite(S.wind)) S.wind = null; },
     wx: async () => { const j = await getJSON("wx"); const arr = Array.isArray(j) ? j : [j]; S.wx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
+    wwx: async () => { const j = await getJSON("wwx"); const arr = Array.isArray(j) ? j : [j]; S.wwx = arr.map(a => ({ t0: Date.parse(a.hourly.time[0] + "Z"), cc: a.hourly.cloud_cover })); },
     ov: async () => { const j = await getJSON("ov"); S.ov = parseOv(j); S.ovS = smoothOv(S.ov); S.ovFull = (j.coordinates || []).length > 30000; /* the site's backup copy only covers Scotland */ S.ovAt = Date.parse(j["Forecast Time"] || j["Observation Time"]) || null; }
   };
   const errs = {};
   const run = async (k) => { try { await jobs[k](); S.status[k] = "ok"; } catch (e) { S.status[k] = "fail"; errs[k] = e; } };
   await run("kp"); // first call alone, so any connector consent prompt appears once
-  await Promise.all(["mag", "wind", "wx", "ov"].map(run));
+  await Promise.all(["mag", "wind", "wx", "ov", "wwx"].map(run));
   loading = false; $("refresh").disabled = false;
   const failed = Object.keys(errs);
   const codes = failed.map(k => errs[k] && errs[k].code).filter(Boolean);
   const code = codes.find(c => CODE_COPY[c]) || null;
-  if (failed.length === 5) {
+  if (["kp", "mag", "wind", "wx", "ov"].every(k => errs[k])) {
     setLive("Offline", "err");
     showNotice(CODE_COPY[code] || "The live feeds didn’t answer. Try again in a minute.", true);
     $("noticeBtn").textContent = ["not_in_manifest", "approval_required", "consent_required"].includes(code) ? "Allow live data" : "Try again";
@@ -1694,9 +1761,18 @@ function hitSpot(e, roomy) {
   for (const p of S.mapPts || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < p.r + (roomy ? 18 : 8) && d < bd) { bd = d; hit = p; } }
   return hit;
 }
+const rowFor = (id) => id.startsWith("w:") ? (S.worldRanked || []).find(x => "w:" + x.s.id === id) : S.ranked.find(x => x.s.id === id);
 function tipRows(r) {
   const kpT = S.hours ? S.hours.map(kpAt).filter(v => v != null) : [];
   const kpMax = kpT.length ? Math.max(...kpT) : null;
+  if (r.world) return [
+    ["Best time (your clock)", r.best.p > 0 ? ltf.format(r.best.t) + " · " + r.best.p + "%" : "no window in the next 12 h"],
+    ["Cloud then", r.best.cc == null ? "unknown" : Math.round(r.best.cc) + "%"],
+    ["Right now", r.nowH.p + "%" + (r.nowH.dark === 0 ? " (too light)" : "")],
+    ["Kp needed here", "≈ " + r.s.need.toFixed(1)],
+    ["Kp tonight", kpMax != null ? kpMax.toFixed(1) : "unknown"],
+    ["From " + (S.here ? "you" : S.townObj.name), Math.round(r.dist / 10) * 10 + " km"]
+  ];
   return [
     ["Best time tonight", r.best.p > 0 ? tf.format(r.best.t) + " · " + r.best.p + "%" : "no window"],
     ["Cloud then", r.best.cc == null ? "unknown" : Math.round(r.best.cc) + "%"],
@@ -1707,7 +1783,7 @@ function tipRows(r) {
   ];
 }
 function showTip(id, mode) {
-  const r = S.ranked.find(x => x.s.id === id), pt = (S.mapPts || []).find(q => q.id === id);
+  const r = rowFor(id), pt = (S.mapPts || []).find(q => q.id === id);
   if (!r || !pt) return hideTip();
   const tip = $("tip");
   tip.textContent = "";
@@ -1725,13 +1801,13 @@ function showTip(id, mode) {
   tip.append(top, dl, note);
   if (mode === "pin") {
     const act = document.createElement("div"); act.className = "tip-actions";
-    const go = document.createElement("button"); go.type = "button"; go.className = "btn solid"; go.textContent = "Show in list";
+    const go = document.createElement("button"); go.type = "button"; go.className = "btn solid"; go.textContent = r.world ? "Centre on map" : "Show in list";
     go.addEventListener("click", (ev) => { ev.stopPropagation(); goToSpot(id); });
     const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = "Close";
     x.addEventListener("click", (ev) => { ev.stopPropagation(); hideTip(); });
     act.append(go, x); tip.append(act);
   } else {
-    const h = document.createElement("div"); h.className = "hint"; h.textContent = "Click to find it in the list"; tip.append(h);
+    const h = document.createElement("div"); h.className = "hint"; h.textContent = r.world ? "Click to centre it on the map" : "Click to find it in the list"; tip.append(h);
   }
   tip.classList.toggle("pinned", mode === "pin");
   tip.hidden = false;
@@ -1749,6 +1825,12 @@ function hideTip() {
   if (had) drawMap();
 }
 function goToSpot(id) {
+  if (id.startsWith("w:")) { // a spot outside Scotland: select it and centre it on the map
+    const r = rowFor(id); hideTip();
+    if (!r) return;
+    S.wsel = id; drawMap(); flyTo(r.s, true); // outside Scotland the coastline is coarse, so stop a little further out
+    return;
+  }
   hideTip();
   S.sel = id; S.picked = true;
   renderSpots(); renderTonight(); drawMap();
