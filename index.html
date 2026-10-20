@@ -219,23 +219,36 @@ select {
 .mapbox canvas { touch-action: manipulation; }
 .mapbox canvas.flow, .mapbox canvas.precip { position: absolute; left: 0; top: 0; width: auto; aspect-ratio: auto; pointer-events: none; }
 .mapbox canvas.precip { mix-blend-mode: screen; }
+/* details card, docked in the map's corner so it never covers the spots around the one you picked */
 .tip {
-  position: absolute; z-index: 2; left: 0; top: 0; width: min(290px, calc(100% - 20px));
-  background: rgba(11, 18, 34, 0.95); border: 1px solid rgba(95, 240, 176, 0.28); border-radius: 14px;
-  padding: 14px 16px; display: grid; gap: 9px; pointer-events: none;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  position: absolute; z-index: 4; left: 10px; bottom: 34px; width: min(330px, calc(100% - 20px));
+  background: rgba(11, 18, 34, 0.94); border: 1px solid rgba(95, 240, 176, 0.28); border-radius: 14px;
+  padding: 12px 14px; display: grid; gap: 8px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
 }
-.tip.pinned { pointer-events: auto; left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; }
-.tip-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.tip-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .tip-top > div { min-width: 0; }
-.tip-name { font: 800 22px/1.02 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
-.tip-area { color: var(--mist); font-size: 13px; margin-top: 3px; }
-.tip-pct { font: 900 36px/0.9 var(--display); flex: none; }
-.tip-pct small { font: 500 12px var(--mono); color: var(--mist); }
-.tip .kv { font-size: 13px; gap: 4px 12px; }
-.tip p { margin: 0; color: var(--mist); font-size: 13px; line-height: 1.45; }
-.tip .hint { font: 400 11px/1.3 var(--mono); color: var(--dim); }
+.tip-name { font: 800 19px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+.tip-area { color: var(--mist); font-size: 12.5px; margin-top: 2px; }
+.tip-pct { font: 900 30px/0.9 var(--display); flex: none; }
+.tip-pct small { font: 500 11px var(--mono); color: var(--mist); }
+.tip-x { flex: none; background: transparent; border: 0; color: var(--mist); font-size: 18px; line-height: 1; padding: 2px 4px; margin: -4px -6px 0 2px; cursor: pointer; border-radius: 6px; }
+.tip-x:hover { color: var(--frost); }
+.tip-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin: 0; }
+.tip-stats div { min-width: 0; }
+.tip-stats dt { font: 500 9.5px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.tip-stats dd { margin: 2px 0 0; font: 500 12.5px/1.25 var(--mono); font-variant-numeric: tabular-nums; color: var(--frost); overflow-wrap: anywhere; }
+.tip p { margin: 0; color: var(--mist); font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tip-actions .btn { padding: 6px 12px; font-size: 12.5px; }
+/* hover: a one-line label just above the dot */
+.chip {
+  position: absolute; z-index: 3; left: 0; top: 0; transform: translate(-50%, -100%); pointer-events: none;
+  background: rgba(6, 10, 19, 0.88); border: 1px solid rgba(233, 238, 246, 0.14); border-radius: 999px;
+  padding: 5px 10px; white-space: nowrap; font: 600 12.5px/1 var(--body); color: var(--frost);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.chip .pc { font: 800 14px/1 var(--display); margin-left: 6px; }
+.chip .sub { font: 400 11px/1 var(--mono); color: var(--mist); margin-left: 6px; }
 .maphint { margin: 10px 2px 0; font: 400 12px/1.4 var(--mono); color: var(--dim); }
 .maphint .touch { display: none; }
 @media (hover: none) { .maphint .mouse { display: none; } .maphint .touch { display: inline; } }
@@ -391,6 +404,7 @@ footer p { margin: 0; max-width: 90ch; }
           <canvas id="map" aria-label="Map of Scotland showing the aurora oval and viewing spots" role="img"></canvas>
           <div class="legend"><span>Aurora oval now<i class="ramp"></i></span><span id="ovTime"></span></div>
           <div class="tip" id="tip" hidden></div>
+          <div class="chip" id="chip" hidden></div>
           <div class="youpin" id="mapPin" hidden><i class="dot"></i><span></span></div>
           <div class="maptools">
             <div class="seg" role="group" aria-label="Map view">
@@ -1799,9 +1813,27 @@ function tipRows(r) {
     ["From " + S.townObj.name, r.ferry ? Math.round(r.dist) + " km + ferry" : Math.round(r.dist) + " km · " + driveText(r.mins)]
   ];
 }
+const SHORT = { "Best time tonight": "Best time", "Best time (your clock)": "Best time", "Kp needed here": "Kp needed" };
 function showTip(id, mode) {
-  const r = rowFor(id), pt = (S.mapPts || []).find(q => q.id === id);
-  if (!r || !pt) return hideTip();
+  const r = rowFor(id);
+  if (!r) return hideTip();
+  if (mode === "hover") {
+    const pt = (S.mapPts || []).find(q => q.id === id), chip = $("chip");
+    if (!pt) { chip.hidden = true; return; }
+    chip.textContent = "";
+    const b = document.createElement("b"); b.textContent = r.s.name;
+    const pc = document.createElement("span"); pc.className = "pc"; pc.style.color = chanceColor(r.best.p); pc.textContent = r.best.p + "%";
+    const sub = document.createElement("span"); sub.className = "sub";
+    sub.textContent = r.best.p > 0 ? "best " + (r.world ? ltf : tf).format(r.best.t) : "no window";
+    chip.append(b, pc, sub);
+    chip.hidden = false;
+    const box = $("mapbox").getBoundingClientRect(), cw = chip.offsetWidth;
+    chip.style.left = clamp(pt.x, cw / 2 + 8, box.width - cw / 2 - 8) + "px";
+    chip.style.top = Math.max(pt.y - pt.r - 10, chip.offsetHeight + 6) + "px";
+    return;
+  }
+  // the docked card
+  $("chip").hidden = true;
   const tip = $("tip");
   tip.textContent = "";
   const top = document.createElement("div"); top.className = "tip-top";
@@ -1811,46 +1843,35 @@ function showTip(id, mode) {
   left.append(nm, ar);
   const pc = document.createElement("div"); pc.className = "tip-pct"; pc.style.color = chanceColor(r.best.p);
   writeChance(pc, r.best.p, true);
-  top.append(left, pc);
-  const dl = document.createElement("dl"); dl.className = "kv";
-  for (const [k, v] of tipRows(r)) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
+  const x = document.createElement("button"); x.type = "button"; x.className = "tip-x"; x.setAttribute("aria-label", "Close"); x.textContent = "×";
+  x.addEventListener("click", (ev) => { ev.stopPropagation(); hideTip(); });
+  top.append(left, pc, x);
+  const dl = document.createElement("dl"); dl.className = "tip-stats";
+  for (const [k, v] of tipRows(r)) { const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = SHORT[k] || k; dd.textContent = v; d.append(dt, dd); dl.append(d); }
   const note = document.createElement("p"); note.textContent = r.s.note;
-  tip.append(top, dl, note);
-  if (mode === "pin") {
-    const act = document.createElement("div"); act.className = "tip-actions";
-    const go = document.createElement("button"); go.type = "button"; go.className = "btn solid"; go.textContent = r.world ? "Centre on map" : "Show in list";
-    go.addEventListener("click", (ev) => { ev.stopPropagation(); goToSpot(id); });
-    const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = "Close";
-    x.addEventListener("click", (ev) => { ev.stopPropagation(); hideTip(); });
-    act.append(go, x); tip.append(act);
-  } else {
-    const h = document.createElement("div"); h.className = "hint"; h.textContent = r.world ? "Click to centre it on the map" : "Click to find it in the list"; tip.append(h);
-  }
-  tip.classList.toggle("pinned", mode === "pin");
+  const act = document.createElement("div"); act.className = "tip-actions";
+  const go = document.createElement("button"); go.type = "button"; go.className = "btn solid"; go.textContent = r.world ? "Centre on map" : "Show in list";
+  go.addEventListener("click", (ev) => { ev.stopPropagation(); goToSpot(id, true); });
+  act.append(go);
+  tip.append(top, dl, note, act);
   tip.hidden = false;
-  if (mode === "pin") { tip.style.left = ""; tip.style.top = ""; return; }
-  const box = $("mapbox").getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
-  let lx = pt.x + pt.r + 14;
-  if (lx + tw > box.width - 10) lx = pt.x - pt.r - 14 - tw;
-  lx = clamp(lx, 10, Math.max(10, box.width - tw - 10));
-  const ty = clamp(pt.y - th / 2, 10, Math.max(10, box.height - th - 10));
-  tip.style.left = lx + "px"; tip.style.top = ty + "px";
 }
 function hideTip() {
   const had = pinned || hoverId;
-  pinned = null; hoverId = null; $("tip").hidden = true;
+  pinned = null; hoverId = null; $("tip").hidden = true; $("chip").hidden = true;
   if (had) drawMap();
 }
-function goToSpot(id) {
+function hideChip() { $("chip").hidden = true; if (hoverId && hoverId !== pinned) { hoverId = null; drawMap(); } }
+function goToSpot(id, keepCard) {
   if (id.startsWith("w:")) { // a spot outside Scotland: select it and centre it on the map
-    const r = rowFor(id); hideTip();
+    const r = rowFor(id); if (!keepCard) hideTip();
     if (!r) return;
     S.wsel = id; drawMap(); flyTo(r.s, true); // outside Scotland the coastline is coarse, so stop a little further out
     return;
   }
-  hideTip();
+  if (!keepCard) hideTip();
   S.sel = id; S.picked = true;
-  renderSpots(); renderTonight(); drawMap();
+  renderSpots(); renderTonight(); drawMap(); flyTo(SPOTS.find(sp => sp.id === id));
   const btn = document.querySelector('.spot[data-id="' + id + '"]');
   if (!btn) return;
   btn.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
@@ -1860,20 +1881,21 @@ function goToSpot(id) {
 const mapEl = $("map");
 mapEl.addEventListener("pointerdown", (e) => { lastPointer = e.pointerType || "mouse"; });
 mapEl.addEventListener("pointermove", (e) => {
-  if (e.pointerType !== "mouse" || pinned || MV.dragging) return;
+  if (e.pointerType !== "mouse" || MV.dragging) { if (MV.dragging) $("chip").hidden = true; return; }
   const p = hitSpot(e, false), id = p ? p.id : null;
   mapEl.style.cursor = p ? "pointer" : "";
   if (id !== hoverId) { hoverId = id; drawMap(); }
-  if (p) showTip(p.id, "hover"); else $("tip").hidden = true;
+  if (p) showTip(p.id, "hover"); else $("chip").hidden = true;
 });
-mapEl.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !pinned) hideTip(); });
+mapEl.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hideChip(); });
 mapEl.addEventListener("click", (e) => {
   if (MV.justDragged) return; // that was a drag, not a click
   const touchy = lastPointer !== "mouse";
   const p = hitSpot(e, touchy);
   if (!p) { if (pinned) hideTip(); return; }
-  if (!touchy || pinned === p.id) { goToSpot(p.id); return; }
-  pinned = p.id; hoverId = p.id; drawMap(); showTip(p.id, "pin");
+  if (touchy && pinned === p.id) { goToSpot(p.id, true); return; } // second tap: go there
+  pinned = p.id; hoverId = p.id; showTip(p.id, "pin");
+  if (!touchy) goToSpot(p.id, true); else drawMap(); // a click selects and goes there; a first tap just opens the card
 });
 document.addEventListener("click", (e) => { if (pinned && !$("mapbox").contains(e.target)) hideTip(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (pinned || hoverId)) hideTip(); });
