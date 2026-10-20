@@ -178,6 +178,20 @@ select {
 .youpin.town .dot { background: #8e8e93; }
 .youpin.town .dot::before { background: rgba(142, 142, 147, 0.28); }
 .youpin.flip span { left: auto; right: 11px; }
+/* preview layout: the map and list live in a glass panel inside the hero, over the video */
+.heroplan { padding: 18px; border-radius: 22px; background: rgba(6, 10, 19, 0.56); -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15); border: 1px solid rgba(233, 238, 246, 0.1); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); min-width: 0; }
+.herolayout .hero .wrap { padding-block: 36px 48px; gap: 20px; }
+.herolayout .hero.cine { min-height: 0; }
+.herolayout .verdict { font-size: clamp(44px, 7vw, 100px); max-width: none; }
+.herolayout .quip { margin-top: 12px; }
+.herolayout .heroplan .head { margin-bottom: 14px; }
+.herolayout .heroplan h2 { font-size: clamp(24px, 3vw, 32px); }
+.herolayout .heroplan .lede { display: none; }
+.herolayout .heroplan .spots { max-height: min(66vh, 620px); overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.herolayout .heroplan .mapcol { position: static; }
+.herolayout .heroplan .mapbox { background: rgba(11, 18, 34, 0.6); }
+.herolayout .heroplan .abroad { margin-bottom: 14px; }
+@media (max-width: 880px) { .herolayout .heroplan { padding: 12px; border-radius: 18px; } .herolayout .heroplan .spots { max-height: none; overflow: visible; } }
 .abroad { margin: 0 0 22px; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(180, 140, 255, 0.35); background: rgba(180, 140, 255, 0.08); max-width: 760px; }
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg button { background: transparent; border: 0; border-radius: 999px; padding: 5px 12px; font: 500 13px/1 var(--body); color: var(--mist); cursor: pointer; }
@@ -332,6 +346,7 @@ footer p { margin: 0; max-width: 90ch; }
         <div class="fact"><span class="eyebrow">Bz now</span><span class="v" id="fBz">–</span></div>
         <div class="fact"><span class="eyebrow">Moon</span><span class="v" id="fMoon">–</span></div>
       </div>
+      <div class="heroplan" id="heroPlan" hidden></div>
     </div>
   </section>
 
@@ -1219,8 +1234,10 @@ function drawMap(fast) {
   if (flowMain && !flowMain.cells.length && (S.ov || kpNow != null)) {
     let edgeLat = null;
     if (local) for (let la = 61.5; la <= 82 && edgeLat == null; la += 0.5) for (let lo = -6; lo <= 2; lo += 2) if (auroraVal(lo, la) >= 4) { edgeLat = la; break; }
-    const msg = edgeLat != null ? "Aurora oval: about " + Math.round((edgeLat - 60.15) * 111 / 50) * 50 + " km north of Shetland. Zoom out to see it" : "No aurora in view. Zoom out to find the oval";
+    const kmN = edgeLat != null ? Math.round((edgeLat - 60.15) * 111 / 50) * 50 : null;
+    let msg = kmN != null ? "Aurora oval: about " + kmN + " km north of Shetland. Zoom out to see it" : "No aurora in view. Zoom out to find the oval";
     c.font = "600 12.5px " + col("--body");
+    if (c.measureText(msg).width > W - 60) msg = kmN != null ? "Aurora oval ~" + kmN + " km north. Zoom out" : "No aurora in view. Zoom out"; // narrow screens
     const mw = c.measureText(msg).width, mx = clamp((W - mw) / 2, 30, W - mw - 12), my = H - 44; // just above the legend
     c.fillStyle = "rgba(6,10,19,0.75)"; c.beginPath(); c.roundRect ? c.roundRect(mx - 26, my - 16, mw + 40, 24, 12) : c.rect(mx - 26, my - 16, mw + 40, 24); c.fill();
     c.fillStyle = col("--dancer");
@@ -1860,6 +1877,18 @@ mapEl.addEventListener("click", (e) => {
 });
 document.addEventListener("click", (e) => { if (pinned && !$("mapbox").contains(e.target)) hideTip(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (pinned || hoverId)) hideTip(); });
+
+/* ---------- preview layout: map and list inside the hero, over the video (?layout=hero, or #hero) ---------- */
+(function heroLayout() {
+  let on = false;
+  try { on = new URLSearchParams(location.search).get("layout") === "hero" || location.hash === "#hero"; } catch (e) { /* default layout */ }
+  if (!on) return;
+  const plan = $("heroPlan"), where = $("where"), inner = where.querySelector(".wrap");
+  while (inner.firstChild) plan.appendChild(inner.firstChild);
+  where.hidden = true; plan.hidden = false;
+  document.documentElement.classList.add("herolayout");
+  requestAnimationFrame(() => drawMap());
+})();
 
 /* ---------- share (public site only) ---------- */
 if (!window.claude) {
