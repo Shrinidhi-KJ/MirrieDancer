@@ -350,7 +350,7 @@ footer p { margin: 0; max-width: 90ch; }
       </div>
       <div class="notice" id="notice" hidden>
         <p id="noticeText"></p>
-        <button class="btn solid" id="noticeBtn" type="button" hidden>Allow live data</button>
+        <button class="btn solid" id="noticeBtn" type="button" hidden>Try again</button>
       </div>
       <div class="facts" aria-label="Key numbers">
         <div class="fact"><span class="eyebrow">Best bet</span><span class="v" id="fBest">–</span></div>
@@ -668,7 +668,7 @@ function writeChance(el, p, smallPct) {
 }
 function chanceColor(p) { return p >= 60 ? "var(--heather)" : p >= 35 ? "var(--dancer)" : p >= 15 ? "var(--teal)" : "var(--dim)"; }
 
-/* ---------- live data: direct from source, else through the viewer's Firecrawl connector ---------- */
+/* ---------- live data: direct from source, else the backup copy the site saves ---------- */
 const URLS = {
   kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
   mag: "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json",
@@ -677,8 +677,9 @@ const URLS = {
   wx: "https://api.open-meteo.com/v1/forecast?latitude=" + SPOTS.map(s => s.lat).join(",") + "&longitude=" + SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT",
   wwx: "https://api.open-meteo.com/v1/forecast?latitude=" + WORLD_SPOTS.map(s => s.lat).join(",") + "&longitude=" + WORLD_SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT"
 };
-const mcpReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("mcp").catch(() => null) : Promise.resolve(null);
-const via = {}; // per source: "live" | "snapshot" | "connector"
+// the public site serves its own copy; any other copy of the page (like the Claude preview) reads the site's
+const SNAP = location.hostname.endsWith("github.io") ? "data/" : "https://shrinidhi-kj.github.io/MirrieDancer/data/";
+const via = {}; // per source: "live" | "snapshot"
 const snapAt = {}; // per snapshot source: when the backup copy was made (ms; NaN if the server sent no Last-Modified)
 // a backup copy older than an hour (or of unknown age) is too old to say what the solar wind is doing right now
 const stale = (k) => via[k] === "snapshot" && !(Date.now() - snapAt[k] < 3600000);
@@ -689,21 +690,11 @@ async function getJSON(key, url) {
     if (r.ok) { const j = await r.json(); via[key] = "live"; return j; }
   } catch (e) { /* blocked or offline: try the snapshot */ }
   try {
-    const r = await fetch("data/" + key + ".json", { cache: "no-store" });
+    const r = await fetch(SNAP + key + ".json", { cache: "no-store" });
     if (r.ok) { const j = await r.json(); via[key] = "snapshot"; snapAt[key] = Date.parse(r.headers.get("Last-Modified")); return j; }
   } catch (e) { /* no snapshot here */ }
-  const mcp = await mcpReady;
-  if (!mcp) throw Object.assign(new Error("No route to live data"), { code: "no_route" });
-  const res = await mcp.callTool("Firecrawl", "firecrawl_scrape",
-    { url, formats: ["rawHtml"], maxAge: 0, objective: "Read live aurora and cloud data for a Scotland northern lights forecast page" },
-    { cache: { staleTime: 240000, gcTime: 3600000 } });
-  const p = res && res.payload;
-  const raw = typeof p === "string" ? p : p && (p.rawHtml ?? (p.data && p.data.rawHtml));
-  if (typeof raw !== "string") throw Object.assign(new Error("Empty reply"), { code: "bad_payload" });
-  via[key] = "connector";
-  return JSON.parse(raw);
+  throw new Error("No route to live data");
 }
-const usesConnector = () => Object.values(via).includes("connector");
 
 const S = {
   kp: null, bz: null, wind: null, ov: null, ovAt: null, wx: null,
@@ -1065,8 +1056,7 @@ function renderStatus() {
     el.append(sp);
   }
   const vs = Object.values(via);
-  if (vs.includes("connector")) el.append("Fetched through your Firecrawl connector.");
-  else if (vs.includes("snapshot")) {
+  if (vs.includes("snapshot")) {
     const t = Math.min(...Object.keys(via).filter(k => via[k] === "snapshot").map(k => snapAt[k])), age = Date.now() - t; // NaN if any age is unknown
     el.append("Some feeds come from a backup copy" + (isNaN(age) ? " of unknown age." : " from " + (age < 3600000 ? Math.round(age / 60000) + " min" : Math.round(age / 3600000) + " h") + " ago."));
   }
@@ -1703,16 +1693,6 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
 let loading = false;
 function setLive(text, kind) { $("liveText").textContent = text; $("dot").className = "dot" + (kind ? " " + kind : ""); }
 function showNotice(msg, btn) { $("notice").hidden = !msg; $("noticeText").textContent = msg || ""; $("noticeBtn").hidden = !btn; }
-const CODE_COPY = {
-  server_not_connected: "Live data reaches this page through the Firecrawl connector. Add Firecrawl in claude.ai Settings → Connectors, then refresh.",
-  selection_required: "You have more than one Firecrawl connector. Pick one when claude.ai asks, then refresh.",
-  needs_reauth: "Your Firecrawl connector needs reconnecting. Go to claude.ai Settings → Connectors, then refresh.",
-  not_in_manifest: "This page needs your OK to fetch live data through Firecrawl.",
-  approval_required: "This page needs your OK to fetch live data through Firecrawl.",
-  consent_required: "This page needs your OK to fetch live data through Firecrawl.",
-  blocked_by_policy: "Your organisation blocks the Firecrawl connector here, so live data can’t load.",
-  no_route: "This copy of the page can’t reach the live data feeds."
-};
 // cloud forecasts cover 57 places a call and Open-Meteo's free daily limit is per IP, so reuse them for 30 minutes (NaN before the first fetch)
 const cloudJob = (k) => async () => {
   if (via[k] !== "snapshot" && Date.now() - S[k + "At"] < 30 * 60000) return; // a backup copy is re-checked every time
@@ -1732,16 +1712,12 @@ async function load() {
   };
   const errs = {};
   const run = async (k) => { try { await jobs[k](); S.status[k] = "ok"; } catch (e) { S.status[k] = "fail"; errs[k] = e; } };
-  await run("kp"); // first call alone, so any connector consent prompt appears once
-  await Promise.all(["mag", "wind", "wx", "ov", "wwx"].filter(k => k !== "wwx" || !usesConnector()).map(run));
+  await Promise.all(["kp", "mag", "wind", "wx", "ov", "wwx"].map(run));
   loading = false; $("refresh").disabled = false;
   const failed = Object.keys(errs);
-  const codes = failed.map(k => errs[k] && errs[k].code).filter(Boolean);
-  const code = codes.find(c => CODE_COPY[c]) || null;
   if (["kp", "mag", "wind", "wx", "ov"].every(k => errs[k])) {
     setLive("Offline", "err");
-    showNotice(CODE_COPY[code] || "The live feeds didn’t answer. Try again in a minute.", true);
-    $("noticeBtn").textContent = ["not_in_manifest", "approval_required", "consent_required"].includes(code) ? "Allow live data" : "Try again";
+    showNotice("The live feeds didn’t answer. Try again in a minute.", true);
   } else {
     showNotice(failed.length ? (failed.includes("wx") ? "The cloud forecast didn’t load, so chances assume patchy cloud." : failed.includes("kp") ? "The Kp forecast didn’t load, so later hours are uncertain." : "") : "", false);
     S.updated = Date.now();
@@ -1763,10 +1739,10 @@ async function loadMine() {
   renderAll();
 }
 let timer = null;
-function schedule() { clearTimeout(timer); timer = setTimeout(load, (usesConnector() ? 60 : 5) * 60000); }
+function schedule() { clearTimeout(timer); timer = setTimeout(load, 5 * 60000); }
 $("refresh").addEventListener("click", load);
 $("noticeBtn").addEventListener("click", load);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > (usesConnector() ? 60 : 10) * 60000) load(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.updated && Date.now() - S.updated > 10 * 60000) load(); });
 
 /* ---------- where am I: the visitor's location by default, else a town they picked ---------- */
 const sel = $("town");
