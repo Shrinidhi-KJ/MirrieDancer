@@ -683,7 +683,7 @@ const URLS = {
   wwx: "https://api.open-meteo.com/v1/forecast?latitude=" + WORLD_SPOTS.map(s => s.lat).join(",") + "&longitude=" + WORLD_SPOTS.map(s => s.lon).join(",") + "&hourly=cloud_cover&past_days=1&forecast_days=2&timezone=GMT"
 };
 // the public site serves its own copy; any other copy of the page (like the Claude preview) reads the site's
-const SNAP = location.hostname.endsWith("github.io") ? "data/" : "https://shrinidhi-kj.github.io/MirrieDancer/data/";
+const SNAP = location.hostname.endsWith("github.io") ? "data/" : "https://mirriedancers.github.io/MirrieDancer/data/";
 const via = {}; // per source: "live" | "snapshot"
 const snapAt = {}; // per snapshot source: when the backup copy was made (ms; NaN if the server sent no Last-Modified)
 // a backup copy older than an hour (or of unknown age) is too old to say what the solar wind is doing right now
