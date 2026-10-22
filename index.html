@@ -12,9 +12,14 @@
 <title>Mirrie Dancers</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Live northern lights chances for dark-sky spots across Scotland.">
+<!-- the hero still, fetched early (same wide/tall split as the footage picker) -->
+<link rel="preload" as="image" href="media/hero-wide.jpg" media="(min-aspect-ratio: 10/11)">
+<link rel="preload" as="image" href="media/hero-tall.jpg" media="(max-aspect-ratio: 10/11)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- added by script, so the page paints straight away instead of waiting for the fonts -->
+<script>{ const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"; document.head.append(l); }</script>
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"></noscript>
 <style>
 /* Layout: a night-sky hero carrying the verdict, then a working field guide: spots + map, tonight's hours, space weather, how to see it. One deliberate dark world. */
 :root {
@@ -93,15 +98,16 @@ h2 {
 .btn[disabled] { opacity: .5; cursor: progress; }
 
 /* hero */
-.hero { position: relative; overflow: hidden; margin-top: -64px; padding-top: 64px; isolation: isolate; }
+.hero { position: relative; overflow: hidden; margin-top: -64px; padding-top: 64px; isolation: isolate; clip-path: inset(0); }
 .hero { --glow: 0.3; }
-.hero canvas.sky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; }
+/* the sky and footage are pinned to the screen (clipped to the hero), so they stay one screen big however tall the hero is */
+.hero canvas.sky { position: fixed; inset: 0 0 auto; width: 100%; height: 100lvh; z-index: -2; }
 .hero video.sky-video {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2;
-  opacity: 0; transition: opacity 1.6s ease, filter 2.5s ease;
-  filter: saturate(calc(0.95 + 0.4 * var(--glow))) brightness(calc(0.95 + 0.2 * var(--glow)));
+  position: fixed; inset: 0 0 auto; width: 100%; height: 100lvh; object-fit: cover; z-index: -2;
+  opacity: 0; transition: opacity 1.6s ease;
 }
-.hero video.sky-video.on { opacity: 1; }
+/* brighter on better nights: opacity over the dark page, which costs nothing per frame (a filter re-ran on every video frame) */
+.hero video.sky-video.on { opacity: calc(0.7 + 0.3 * var(--glow)); }
 .hero.cine { min-height: min(88svh, 860px); display: flex; flex-direction: column; justify-content: flex-end; }
 .hero.cine > .wrap { width: 100%; }
 .hero.cine::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(100deg, rgba(6, 10, 19, 0.62) 0%, rgba(6, 10, 19, 0.3) 40%, transparent 68%), linear-gradient(to bottom, rgba(6, 10, 19, 0.45), transparent 18%); }
@@ -178,8 +184,7 @@ select {
 .youpin.town .dot::before { background: rgba(142, 142, 147, 0.28); }
 .youpin.flip span { left: auto; right: 11px; }
 /* preview layout: the map and list live in a glass panel inside the hero, over the video */
-.heroplan { padding: 18px; border-radius: 22px; background: rgba(6, 10, 19, 0.56); -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15); border: 1px solid rgba(233, 238, 246, 0.1); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); min-width: 0; transition: background-color 0.3s ease; }
-body.map-live .heroplan { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(6, 10, 19, 0.86); transition: none; }
+.heroplan { padding: 18px; border-radius: 22px; background: rgba(6, 10, 19, 0.74); border: 1px solid rgba(233, 238, 246, 0.1); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); min-width: 0; }
 .herolayout .hero .wrap { padding-block: 36px 48px; gap: 20px; }
 .herolayout .hero.cine { min-height: 0; }
 .herolayout .verdict { font-size: clamp(44px, 7vw, 100px); max-width: none; }
@@ -1084,12 +1089,11 @@ function spotLabel(c, W, lab, lw, x, y, r) {
   c.fillText(lab, clamp(x - lw / 2, 8, W - lw - 8), y - r - 8);
 }
 const MV = { mode: "globe", g: { custom: false, lat: 0, lon: 0, R: 0 }, m: { custom: false, lonC: 0, latC: 15, s: 1 }, dragging: false, justDragged: false };
-// While the map moves, the hero's frosted panel swaps its blur for a plain tint and the canvas sky holds still:
-// re-blurring the backdrop behind a moving map on every frame is what made it stutter there.
-function mapLive(on) { if (MV.moving === on) return; MV.moving = on; document.body.classList.toggle("map-live", on); }
 const DETAIL = { w: -10.5, e: 3.5, s: 53.6, n: 61.4 }; // where the detailed Scotland coastline applies
 const wrapLon = (d) => ((d % 360) + 540) % 360 - 180;
+let mapReady = false; // the first map draw waits one frame, so the page paints before it
 function drawMap(fast) {
+  if (!mapReady) return;
   const box = $("mapbox"), cv = $("map");
   box.classList.toggle("flat", MV.mode === "map");
   const r = cv.getBoundingClientRect();
@@ -1314,7 +1318,7 @@ function flyTo(place, wide) {
   const step = (now) => {
     const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     set(e);
-    mapLive(k < 1);
+    MV.moving = k < 1;
     if (k < 1) { drawMap(true); flight = requestAnimationFrame(step); } else drawMap(false);
   };
   flight = requestAnimationFrame(step);
@@ -1330,11 +1334,11 @@ function flyTo(place, wide) {
     let busy = false;
     if (Math.abs(Math.log(zoomGoal)) > 0.002) { const k = Math.pow(zoomGoal, 0.28); zoom(k); zoomGoal /= k; busy = true; } else zoomGoal = 1;
     if (!MV.dragging && (Math.abs(vel[0]) > 0.05 || Math.abs(vel[1]) > 0.05)) { pan(vel[0] * 16, vel[1] * 16); vel = [vel[0] * 0.9, vel[1] * 0.9]; busy = true; } else if (!MV.dragging) vel = [0, 0];
-    mapLive(true);
+    MV.moving = true; // the canvas sky holds still while the map moves
     drawMap(true);
     if (busy || MV.dragging) { if (busy) kick(); }
     clearTimeout(settleT);
-    settleT = setTimeout(() => { if (!MV.dragging && zoomGoal === 1 && !vel[0] && !vel[1]) { mapLive(false); drawMap(false); } }, 140);
+    settleT = setTimeout(() => { if (!MV.dragging && zoomGoal === 1 && !vel[0] && !vel[1]) { MV.moving = false; drawMap(false); } }, 140);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   const take = () => { // the first move takes over from the automatic view
@@ -1646,7 +1650,8 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
     c.beginPath(); c.moveTo(0, H); for (let x = 0; x <= W; x += 8) c.lineTo(x, ridge(x)); c.lineTo(W, H); c.closePath();
     c.fillStyle = "#04070d"; c.fill();
   }
-  size(); requestAnimationFrame(frame);
+  requestAnimationFrame(frame); // sized by the ResizeObserver below once layout is done (measuring here forced an early layout)
+  sky.start = () => { sky.video = false; cv.hidden = false; requestAnimationFrame(frame); };
   if ("IntersectionObserver" in window) new IntersectionObserver((es) => {
     sky.hidden = !es[0].isIntersecting;
     if (!sky.hidden && sky.paused) { sky.paused = false; requestAnimationFrame(frame); }
@@ -1677,11 +1682,19 @@ const sky = { intensity: 0.2, t: 0, stars: [] };
     credit.textContent = pick.credit; credit.hidden = false;
     sky.video = true; $("sky").hidden = true;
   }
+  // the still shows at once (the animated sky never starts); the footage downloads once the forecast is in
   v.poster = pick.poster;
-  v.src = pick.src;
-  v.preload = reduce ? "metadata" : "auto";
-  v.addEventListener("loadeddata", () => { show(); if (!reduce) v.play().catch(() => { /* autoplay refused: the first frame stays as a still */ }); }, { once: true });
-  v.load();
+  show();
+  v.addEventListener("error", () => { // no footage on this server: back to the animated sky
+    shown = false; v.hidden = true; credit.hidden = true;
+    document.querySelector(".hero").classList.remove("cine");
+    sky.start();
+  }, { once: true });
+  document.addEventListener("mirrie:loaded", () => {
+    v.preload = reduce ? "metadata" : "auto";
+    v.src = pick.src;
+    if (!reduce) v.play().catch(() => { /* autoplay refused: the still stays */ });
+  }, { once: true });
   let heroInView = true;
   const sync = () => { if (!shown || reduce) return; if (document.hidden || !heroInView) v.pause(); else v.play().catch(() => {}); };
   document.addEventListener("visibilitychange", sync);
@@ -1726,6 +1739,7 @@ async function load() {
   renderAll();
   loadMine();
   schedule();
+  document.dispatchEvent(new Event("mirrie:loaded"));
 }
 async function loadMine() {
   if (!S.here) return;
@@ -2004,6 +2018,7 @@ if (!window.claude) {
 }
 
 new ResizeObserver(() => drawMap()).observe($("map"));
+requestAnimationFrame(() => setTimeout(() => { mapReady = true; drawMap(); }));
 
 compute(); renderSpots(); renderTonight(); renderStatus(); drawMap();
 load();
